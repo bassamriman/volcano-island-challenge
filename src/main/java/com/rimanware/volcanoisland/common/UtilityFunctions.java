@@ -3,7 +3,10 @@ package com.rimanware.volcanoisland.common;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedList;
+import java.util.stream.Stream;
 
 public final class UtilityFunctions {
 
@@ -35,5 +38,17 @@ public final class UtilityFunctions {
         addAll(immutableSet2);
       }
     }.stream().collect(ImmutableSet.toImmutableSet());
+  }
+
+  public static ImmutableSet<LocalDate> generateAllDatesInRange(
+      LocalDate startDate, LocalDate endDate) {
+    return Stream.iterate(startDate, d -> d.plusDays(1))
+        .limit(
+            ChronoUnit.DAYS.between(
+                startDate,
+                // Increment by one because ChronoUnit.DAYS.between API
+                // to date is exclusive
+                endDate.plusDays(1)))
+        .collect(ImmutableSet.toImmutableSet());
   }
 }

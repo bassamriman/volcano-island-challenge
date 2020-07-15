@@ -203,7 +203,7 @@ public class ConcurrencyTest extends RoutesTester {
     requesterActorSystem.terminate();
   }
 
-  private void deleteBooking(BookingConfirmation warmUpBookingConfirmation) {
+  private void deleteBooking(final BookingConfirmation warmUpBookingConfirmation) {
     volcanoIslandApp
         .run(
             HttpRequest.DELETE("/bookings/" + warmUpBookingConfirmation.getBookingConfirmationId()))
@@ -211,14 +211,14 @@ public class ConcurrencyTest extends RoutesTester {
   }
 
   private BookingConfirmation createBookingWithConfirmation(
-      LocalDate createArrivalDate, LocalDate createDepartureDate) {
+          final LocalDate createArrivalDate, final LocalDate createDepartureDate) {
     return volcanoIslandApp
         .run(createRequest(createArrivalDate, createDepartureDate))
         .assertStatusCode(StatusCodes.CREATED)
         .entity(Jackson.unmarshaller(BookingConfirmation.class));
   }
 
-  private List<TestRouteResult> startExecuting(ImmutableList<ActorRef> requesters) {
+  private List<TestRouteResult> startExecuting(final ImmutableList<ActorRef> requesters) {
     final ImmutableList<CompletableFuture<TestRouteResult>> resultFutures =
         requesters.stream()
             .map(
@@ -233,22 +233,22 @@ public class ConcurrencyTest extends RoutesTester {
 
     try {
       return combinedDataCompletionStage.toCompletableFuture().get();
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (final InterruptedException | ExecutionException e) {
       e.printStackTrace();
     }
     return ImmutableList.of();
   }
 
-  private <T> Tuple<T, Long> timedInMilliseconds(Supplier<T> function) {
-    long startTime = System.nanoTime();
-    T result = function.get();
-    long endTime = System.nanoTime();
-    long timeElapsed = endTime - startTime;
+  private <T> Tuple<T, Long> timedInMilliseconds(final Supplier<T> function) {
+    final long startTime = System.nanoTime();
+    final T result = function.get();
+    final long endTime = System.nanoTime();
+    final long timeElapsed = endTime - startTime;
     return Tuple.create(result, timeElapsed / 1000000);
   }
 
-  private <T> CompletableFuture<List<T>> waitOnAll(List<CompletableFuture<T>> futuresList) {
-    CompletableFuture<Void> allFuturesResult =
+  private <T> CompletableFuture<List<T>> waitOnAll(final List<CompletableFuture<T>> futuresList) {
+    final CompletableFuture<Void> allFuturesResult =
         CompletableFuture.allOf(futuresList.toArray(new CompletableFuture[futuresList.size()]));
     return allFuturesResult.thenApply(
         v -> futuresList.stream().map(future -> future.join()).collect(Collectors.<T>toList()));

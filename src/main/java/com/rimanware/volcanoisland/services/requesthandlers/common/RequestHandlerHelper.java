@@ -16,7 +16,8 @@ public final class RequestHandlerHelper {
   public static RequestHandlerResponse.Failure collectAllFailures(
       final ImmutableList<LocalDate> alreadyBookedFailedDates,
       final ImmutableList<RollingMonthDatabaseResponse.RequestedDateOutOfRange>
-          outOfRangeFailedDates) {
+          outOfRangeFailedDates,
+      final APIErrorMessages apiErrorMessages) {
     return RequestHandlerResponse.Failure.failed(
         DateErrors.create(
             Stream.concat(

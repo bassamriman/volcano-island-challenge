@@ -2,46 +2,56 @@ package com.rimanware.volcanoisland.services.requesthandlers;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
-import akka.actor.PoisonPill;
 import akka.actor.Props;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.rimanware.volcanoisland.common.LoggingReceiveActor;
 import com.rimanware.volcanoisland.common.UtilityFunctions;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseResponse;
 import com.rimanware.volcanoisland.database.models.Booking;
+import com.rimanware.volcanoisland.errors.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.requests.BookingRequest;
 import com.rimanware.volcanoisland.services.models.responses.BookingConfirmation;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerCommand;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerResponse;
+import com.rimanware.volcanoisland.services.requesthandlers.common.BookingRequestState;
+import com.rimanware.volcanoisland.services.requesthandlers.common.RequestHandlerActor;
+import com.rimanware.volcanoisland.services.requesthandlers.common.ResponseCollector;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.stream.Stream;
 
 import static com.rimanware.volcanoisland.services.requesthandlers.common.RequestHandlerHelper.collectAllFailures;
 
-public final class CreateBookingRequestHandlerActor extends LoggingReceiveActor {
+public final class CreateBookingRequestHandlerActor
+    extends RequestHandlerActor<BookingRequestState> {
+  private final APIErrorMessages apiErrorMessages;
   private final BookingRequest bookingRequest;
   private final ActorRef database;
 
   private CreateBookingRequestHandlerActor(
-      final BookingRequest bookingRequest, final ActorRef database) {
+      final BookingRequest bookingRequest,
+      final APIErrorMessages apiErrorMessages,
+      final ActorRef database) {
+    this.apiErrorMessages = apiErrorMessages;
     this.bookingRequest = bookingRequest;
     this.database = database;
   }
 
   private static CreateBookingRequestHandlerActor create(
-      final BookingRequest bookingRequest, final ActorRef database) {
-    return new CreateBookingRequestHandlerActor(bookingRequest, database);
+      final BookingRequest bookingRequest,
+      final APIErrorMessages apiErrorMessages,
+      final ActorRef database) {
+    return new CreateBookingRequestHandlerActor(bookingRequest, apiErrorMessages, database);
   }
 
-  public static Props props(final BookingRequest bookingRequest, final ActorRef database) {
+  public static Props props(
+      final BookingRequest bookingRequest,
+      final APIErrorMessages apiErrorMessages,
+      final ActorRef database) {
     return Props.create(
         CreateBookingRequestHandlerActor.class,
-        () -> CreateBookingRequestHandlerActor.create(bookingRequest, database));
+        () -> CreateBookingRequestHandlerActor.create(bookingRequest, apiErrorMessages, database));
   }
 
   @Override
@@ -56,45 +66,37 @@ public final class CreateBookingRequestHandlerActor extends LoggingReceiveActor 
             book -> {
               final ActorRef sender = sender();
               final ImmutableSet<LocalDate> daysToBook =
-                  Stream.iterate(bookingRequest.getArrivalDate(), d -> d.plusDays(1))
-                      .limit(
-                          ChronoUnit.DAYS.between(
-                              bookingRequest.getArrivalDate(),
-                              // Increment by one because ChronoUnit.DAYS.between API
-                              // to date is exclusive
-                              bookingRequest.getDepartureDate().plusDays(1)))
-                      .collect(ImmutableSet.toImmutableSet());
+                  UtilityFunctions.generateAllDatesInRange(
+                      bookingRequest.getArrivalDate(), bookingRequest.getDepartureDate());
+
               final Booking booking = Booking.fromBookingRequest(bookingRequest);
               daysToBook.forEach(
                   day -> database.tell(SingleDateDatabaseCommand.book(booking, day), self()));
 
+              final ImmutableSet<String> expectedDateCreateResponses =
+                  daysToBook.stream()
+                      .map(LocalDate::toString)
+                      .collect(ImmutableSet.toImmutableSet());
+
               getContext()
                   .become(
                       collectingResponses(
-                          ImmutableSet.of(),
-                          ImmutableList.of(),
-                          ImmutableList.of(),
-                          ImmutableList.of(),
-                          daysToBook.stream()
-                              .map(LocalDate::toString)
-                              .collect(ImmutableSet.toImmutableSet()),
-                          booking,
-                          sender));
+                          ResponseCollector.empty(expectedDateCreateResponses),
+                          BookingRequestState.empty(booking, sender)));
             })
         .matchAny(o -> log.info("received unknown message"))
         .build();
   }
 
-  // TODO: clean up duplicated code
-  private AbstractActor.Receive collectingResponses(
-      final ImmutableSet<String> collectedDateBookingResponses,
-      final ImmutableList<LocalDate> bookedDates,
-      final ImmutableList<LocalDate> alreadyBookedFailedDates,
-      final ImmutableList<RollingMonthDatabaseResponse.RequestedDateOutOfRange>
-          outOfRangeFailedDates,
-      final ImmutableSet<String> expectedDateBookingResponses,
-      final Booking booking,
-      final ActorRef sender) {
+  private static ImmutableList<LocalDate> datesToRollBack(
+      final BookingRequestState bookingRequestState) {
+    return bookingRequestState.getNewlyBookedDates();
+  }
+
+  @Override
+  protected Receive collectingResponses(
+      final ResponseCollector<String> currentResponseCollector,
+      final BookingRequestState currentCreateBookingRequestState) {
     return receiveBuilder()
         .match(
             SingleDateDatabaseResponse.ProbatoryBookingConfirmation.class,
@@ -102,76 +104,33 @@ public final class CreateBookingRequestHandlerActor extends LoggingReceiveActor 
               final LocalDate bookedDate = bookingConfirmation.getBookingConfirmation().getDate();
               final String bookedDateAsString = bookedDate.toString();
 
-              if (expectedDateBookingResponses.contains(bookedDateAsString)) {
-                final ImmutableList<LocalDate> newBookedDates =
-                    UtilityFunctions.addToImmutableList(bookedDates, bookedDate);
+              final ResponseCollector<String> newResponseCollector =
+                  currentResponseCollector.collect(bookedDateAsString);
+              final BookingRequestState newCreateBookingRequestState =
+                  currentCreateBookingRequestState.addNewlyBookedDate(bookedDate);
 
-                final ImmutableSet<String> newCollectedDateBookingResponses =
-                    UtilityFunctions.addToImmutableSet(
-                        collectedDateBookingResponses, bookedDateAsString);
-
-                if (newCollectedDateBookingResponses.containsAll(expectedDateBookingResponses)) {
-                  handleResult(
-                      newBookedDates,
-                      alreadyBookedFailedDates,
-                      outOfRangeFailedDates,
-                      booking,
-                      sender);
-                } else {
-                  getContext()
-                      .become(
-                          collectingResponses(
-                              newCollectedDateBookingResponses,
-                              newBookedDates,
-                              alreadyBookedFailedDates,
-                              outOfRangeFailedDates,
-                              expectedDateBookingResponses,
-                              booking,
-                              sender));
-                }
-              } else {
-                throw new IllegalStateException(
-                    "Received response for a date that wasn't expected");
-              }
+              nextStateOrCompleteRequestWithRollback(
+                  newResponseCollector,
+                  newCreateBookingRequestState,
+                  CreateBookingRequestHandlerActor::datesToRollBack,
+                  database);
             })
         .match(
             SingleDateDatabaseResponse.IsBooked.class,
             isBooked -> {
-              final LocalDate bookedDate = isBooked.getDate();
-              final String bookedDateAsString = bookedDate.toString();
+              final LocalDate isBookedDate = isBooked.getDate();
+              final String isBookedAsString = isBookedDate.toString();
 
-              if (expectedDateBookingResponses.contains(bookedDateAsString)) {
-                final ImmutableList<LocalDate> newAlreadyBookedFailedDates =
-                    UtilityFunctions.addToImmutableList(alreadyBookedFailedDates, bookedDate);
+              final ResponseCollector<String> newResponseCollector =
+                  currentResponseCollector.collect(isBookedAsString);
+              final BookingRequestState newCreateBookingRequestState =
+                  currentCreateBookingRequestState.addAlreadyBookedDate(isBookedDate);
 
-                final ImmutableSet<String> newCollectedDateBookingResponses =
-                    UtilityFunctions.addToImmutableSet(
-                        collectedDateBookingResponses, bookedDateAsString);
-
-                if (newCollectedDateBookingResponses.containsAll(expectedDateBookingResponses)) {
-                  handleResult(
-                      bookedDates,
-                      newAlreadyBookedFailedDates,
-                      outOfRangeFailedDates,
-                      booking,
-                      sender);
-                } else {
-                  getContext()
-                      .become(
-                          collectingResponses(
-                              newCollectedDateBookingResponses,
-                              bookedDates,
-                              newAlreadyBookedFailedDates,
-                              outOfRangeFailedDates,
-                              expectedDateBookingResponses,
-                              booking,
-                              sender));
-                }
-
-              } else {
-                throw new IllegalStateException(
-                    "Received response for a date that wasn't expected");
-              }
+              nextStateOrCompleteRequestWithRollback(
+                  newResponseCollector,
+                  newCreateBookingRequestState,
+                  CreateBookingRequestHandlerActor::datesToRollBack,
+                  database);
             })
         .match(
             RollingMonthDatabaseResponse.RequestedDateOutOfRange.class,
@@ -179,72 +138,34 @@ public final class CreateBookingRequestHandlerActor extends LoggingReceiveActor 
               final LocalDate dateOutOfRange = requestedDateOutOfRange.getRequestedDate();
               final String dateOutOfRangeAsString = dateOutOfRange.toString();
 
-              if (expectedDateBookingResponses.contains(dateOutOfRangeAsString)) {
-                final ImmutableList<RollingMonthDatabaseResponse.RequestedDateOutOfRange>
-                    newOutOfRangeFailedDates =
-                        UtilityFunctions.addToImmutableList(
-                            outOfRangeFailedDates, requestedDateOutOfRange);
+              final ResponseCollector<String> newResponseCollector =
+                  currentResponseCollector.collect(dateOutOfRangeAsString);
+              final BookingRequestState newCreateBookingRequestState =
+                  currentCreateBookingRequestState.addOutOfRangeDate(requestedDateOutOfRange);
 
-                final ImmutableSet<String> newCollectedDateBookingResponses =
-                    UtilityFunctions.addToImmutableSet(
-                        collectedDateBookingResponses, dateOutOfRangeAsString);
-
-                if (newCollectedDateBookingResponses.containsAll(expectedDateBookingResponses)) {
-                  handleResult(
-                      bookedDates,
-                      alreadyBookedFailedDates,
-                      newOutOfRangeFailedDates,
-                      booking,
-                      sender);
-                } else {
-                  getContext()
-                      .become(
-                          collectingResponses(
-                              newCollectedDateBookingResponses,
-                              bookedDates,
-                              alreadyBookedFailedDates,
-                              newOutOfRangeFailedDates,
-                              expectedDateBookingResponses,
-                              booking,
-                              sender));
-                }
-
-              } else {
-                throw new IllegalStateException(
-                    "Received response for a date that wasn't expected");
-              }
+              nextStateOrCompleteRequestWithRollback(
+                  newResponseCollector,
+                  newCreateBookingRequestState,
+                  CreateBookingRequestHandlerActor::datesToRollBack,
+                  database);
             })
         .matchAny(o -> log.info("received unknown message"))
         .build();
   }
 
-  private void handleResult(
-      final ImmutableList<LocalDate> bookedDates,
-      final ImmutableList<LocalDate> alreadyBookedFailedDates,
-      final ImmutableList<RollingMonthDatabaseResponse.RequestedDateOutOfRange>
-          outOfRangeFailedDates,
-      final Booking booking,
-      final ActorRef sender) {
-    if (!alreadyBookedFailedDates.isEmpty() || !outOfRangeFailedDates.isEmpty()) {
-      // Collect All errors
-      final RequestHandlerResponse.Failure multipleDateFailures =
-          collectAllFailures(alreadyBookedFailedDates, outOfRangeFailedDates);
+  @Override
+  protected RequestHandlerResponse createResponse(
+      final BookingRequestState createBookingRequestState) {
+    if (!createBookingRequestState.getAlreadyBookedDates().isEmpty()
+        || !createBookingRequestState.getOutOfRangeDates().isEmpty()) {
+      return collectAllFailures(
+          createBookingRequestState.getAlreadyBookedDates(),
+          createBookingRequestState.getOutOfRangeDates(),
+          apiErrorMessages);
 
-      // Inform sender of failure
-      sender.tell(multipleDateFailures, self());
-
-      // Rollback updated dates
-      bookedDates.forEach(date -> database.tell(SingleDateDatabaseCommand.revert(date), self()));
     } else {
-
-      sender.tell(
-          RequestHandlerResponse.Success.succeeded(BookingConfirmation.create(booking.getId())),
-          self());
-
-      // Commit all changes
-      bookedDates.forEach(date -> database.tell(SingleDateDatabaseCommand.commit(date), self()));
+      return RequestHandlerResponse.Success.succeeded(
+          BookingConfirmation.create(createBookingRequestState.getBooking().getId()));
     }
-    // We are done handling the request this actor will suicide
-    self().tell(PoisonPill.getInstance(), self());
   }
 }

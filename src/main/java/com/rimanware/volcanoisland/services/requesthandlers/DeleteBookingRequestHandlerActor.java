@@ -1,11 +1,8 @@
 package com.rimanware.volcanoisland.services.requesthandlers;
 
 import akka.actor.ActorRef;
-import akka.actor.PoisonPill;
 import akka.actor.Props;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.rimanware.volcanoisland.common.LoggingReceiveActor;
 import com.rimanware.volcanoisland.common.UtilityFunctions;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
@@ -16,27 +13,35 @@ import com.rimanware.volcanoisland.errors.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.responses.BookingConfirmation;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerCommand;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerResponse;
+import com.rimanware.volcanoisland.services.requesthandlers.common.RequestHandlerActor;
+import com.rimanware.volcanoisland.services.requesthandlers.common.ResponseCollector;
+import com.rimanware.volcanoisland.services.requesthandlers.common.SenderProvider;
 
 import java.time.LocalDate;
 
-public final class DeleteBookingRequestHandlerActor extends LoggingReceiveActor {
+public final class DeleteBookingRequestHandlerActor
+    extends RequestHandlerActor<DeleteBookingRequestHandlerActor.DeleteRequestState> {
+  private final APIErrorMessages apiErrorMessages;
   private final String bookingId;
   private final ActorRef database;
 
-  private DeleteBookingRequestHandlerActor(final String bookingId, final ActorRef database) {
+  private DeleteBookingRequestHandlerActor(
+      final String bookingId, final APIErrorMessages apiErrorMessages, final ActorRef database) {
+    this.apiErrorMessages = apiErrorMessages;
     this.bookingId = bookingId;
     this.database = database;
   }
 
   private static DeleteBookingRequestHandlerActor create(
-      final String bookingId, final ActorRef database) {
-    return new DeleteBookingRequestHandlerActor(bookingId, database);
+      final String bookingId, final APIErrorMessages apiErrorMessages, final ActorRef database) {
+    return new DeleteBookingRequestHandlerActor(bookingId, apiErrorMessages, database);
   }
 
-  public static Props props(final String bookingId, final ActorRef database) {
+  public static Props props(
+      final String bookingId, final APIErrorMessages apiErrorMessages, final ActorRef database) {
     return Props.create(
         DeleteBookingRequestHandlerActor.class,
-        () -> DeleteBookingRequestHandlerActor.create(bookingId, database));
+        () -> DeleteBookingRequestHandlerActor.create(bookingId, apiErrorMessages, database));
   }
 
   @Override
@@ -63,25 +68,20 @@ public final class DeleteBookingRequestHandlerActor extends LoggingReceiveActor 
             RollingMonthDatabaseResponse.QueryableDates.class,
             queryableDates -> {
               database.tell(SingleDateDatabaseCommand.cancel(bookingId), self());
-
               getContext()
                   .become(
                       collectingResponses(
-                          ImmutableSet.of(),
-                          ImmutableList.of(),
-                          queryableDates.getQueryableDates(),
-                          originalSender));
+                          ResponseCollector.empty(queryableDates.getQueryableDates()),
+                          DeleteRequestState.empty(originalSender)));
             })
         .matchAny(o -> log.info("received unknown message"))
         .build();
   }
 
-  // TODO: clean up duplicated code
-  private Receive collectingResponses(
-      final ImmutableSet<String> collectedDateCancellationResponses,
-      final ImmutableList<LocalDate> cancelledDates,
-      final ImmutableSet<String> expectedDateCancellationResponses,
-      final ActorRef originalSender) {
+  @Override
+  protected Receive collectingResponses(
+      final ResponseCollector<String> currentResponseCollector,
+      final DeleteRequestState currentDeleteRequestState) {
     return receiveBuilder()
         .match(
             SingleDateDatabaseResponse.CancellationConfirmation.class,
@@ -89,30 +89,12 @@ public final class DeleteBookingRequestHandlerActor extends LoggingReceiveActor 
               final LocalDate cancelledDate = cancellationConfirmation.getDate();
               final String cancelledDateAsString = cancelledDate.toString();
 
-              if (expectedDateCancellationResponses.contains(cancelledDateAsString)) {
-                final ImmutableList<LocalDate> newCancelledDates =
-                    UtilityFunctions.addToImmutableList(cancelledDates, cancelledDate);
+              final ResponseCollector<String> newResponseCollector =
+                  currentResponseCollector.collect(cancelledDateAsString);
+              final DeleteRequestState newDeleteRequestState =
+                  currentDeleteRequestState.addCancelledDate(cancelledDate);
 
-                final ImmutableSet<String> newCollectedDateCancellationResponses =
-                    UtilityFunctions.addToImmutableSet(
-                        collectedDateCancellationResponses, cancelledDateAsString);
-
-                if (newCollectedDateCancellationResponses.containsAll(
-                    expectedDateCancellationResponses)) {
-                  handleResult(newCancelledDates, originalSender);
-                } else {
-                  getContext()
-                      .become(
-                          collectingResponses(
-                              newCollectedDateCancellationResponses,
-                              newCancelledDates,
-                              expectedDateCancellationResponses,
-                              originalSender));
-                }
-              } else {
-                throw new IllegalStateException(
-                    "Received response for a date that wasn't expected");
-              }
+              nextStateOrCompleteRequest(newResponseCollector, newDeleteRequestState);
             })
         .match(
             SingleDateDatabaseResponse.DoesntQualifyForCancellationConfirmation.class,
@@ -122,48 +104,60 @@ public final class DeleteBookingRequestHandlerActor extends LoggingReceiveActor 
               final String notQualifyingForCancellationConfirmationDateAsString =
                   notQualifyingForCancellationConfirmationDate.toString();
 
-              if (expectedDateCancellationResponses.contains(
-                  notQualifyingForCancellationConfirmationDateAsString)) {
+              final ResponseCollector<String> newResponseCollector =
+                  currentResponseCollector.collect(
+                      notQualifyingForCancellationConfirmationDateAsString);
 
-                final ImmutableSet<String> newCollectedDateCancellationResponses =
-                    UtilityFunctions.addToImmutableSet(
-                        collectedDateCancellationResponses,
-                        notQualifyingForCancellationConfirmationDateAsString);
-
-                if (newCollectedDateCancellationResponses.containsAll(
-                    expectedDateCancellationResponses)) {
-                  handleResult(cancelledDates, originalSender);
-                } else {
-                  getContext()
-                      .become(
-                          collectingResponses(
-                              newCollectedDateCancellationResponses,
-                              cancelledDates,
-                              expectedDateCancellationResponses,
-                              originalSender));
-                }
-              } else {
-                throw new IllegalStateException(
-                    "Received response for a date that wasn't expected");
-              }
+              nextStateOrCompleteRequest(newResponseCollector, currentDeleteRequestState);
             })
         .matchAny(o -> log.info("received unknown message {}", o))
         .build();
   }
 
-  private void handleResult(
-      final ImmutableList<LocalDate> cancelledDates, final ActorRef originalSender) {
-    if (cancelledDates.isEmpty()) {
-      final RequestHandlerResponse.Failure failure =
-          RequestHandlerResponse.Failure.failed(
-              APIError.BookingIdNotFoundError, APIErrorMessages.ENGLISH);
-      // Inform sender of failure
-      originalSender.tell(failure, self());
+  @Override
+  protected RequestHandlerResponse createResponse(final DeleteRequestState deleteRequestState) {
+    if (deleteRequestState.getCancelledDates().isEmpty()) {
+      return RequestHandlerResponse.Failure.failed(
+          APIError.BookingIdNotFoundError, apiErrorMessages);
     } else {
-      originalSender.tell(
-          RequestHandlerResponse.Success.succeeded(BookingConfirmation.create(bookingId)), self());
+      return RequestHandlerResponse.Success.succeeded(BookingConfirmation.create(bookingId));
     }
-    // We are done handling the request this actor will suicide
-    self().tell(PoisonPill.getInstance(), self());
+  }
+
+  protected static class DeleteRequestState implements SenderProvider {
+    private final ImmutableList<LocalDate> cancelledDates;
+    private final ActorRef sender;
+
+    private DeleteRequestState(
+        final ImmutableList<LocalDate> cancelledDates, final ActorRef sender) {
+      this.cancelledDates = cancelledDates;
+      this.sender = sender;
+    }
+
+    public static DeleteRequestState empty(final ActorRef sender) {
+      return create(ImmutableList.of(), sender);
+    }
+
+    private static DeleteRequestState create(
+        final ImmutableList<LocalDate> newCancelledDates, final ActorRef sender) {
+      return new DeleteRequestState(newCancelledDates, sender);
+    }
+
+    public DeleteRequestState addCancelledDates(final ImmutableList<LocalDate> newCancelledDates) {
+      return create(UtilityFunctions.combine(cancelledDates, newCancelledDates), sender);
+    }
+
+    public DeleteRequestState addCancelledDate(final LocalDate newCancelledDate) {
+      return addCancelledDates(ImmutableList.of(newCancelledDate));
+    }
+
+    public ImmutableList<LocalDate> getCancelledDates() {
+      return cancelledDates;
+    }
+
+    @Override
+    public ActorRef getSender() {
+      return sender;
+    }
   }
 }

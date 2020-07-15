@@ -9,7 +9,6 @@ import akka.http.javadsl.testkit.JUnitRouteTest;
 import akka.http.javadsl.testkit.TestRoute;
 import akka.http.javadsl.testkit.TestRouteResult;
 import akka.util.Timeout;
-import com.rimanware.volcanoisland.common.BookingConstraints;
 import com.rimanware.volcanoisland.database.RollingMonthDatabaseActor;
 import com.rimanware.volcanoisland.database.SingleDateDatabaseManagerActor;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
@@ -71,28 +70,31 @@ public abstract class RoutesTester extends JUnitRouteTest {
         system()
             .actorOf(
                 RequestHandlerDispatcherActorFactory
-                    .createBookingRequestHandlerDispatcherActorProps(rollingMonthDatabaseActor),
+                    .createBookingRequestHandlerDispatcherActorProps(
+                        rollingMonthDatabaseActor, apiErrorMessages),
                 "CreateBookingRequestHandlerDispatcherActor-" + UUID.randomUUID().toString());
 
     updateBookingRequestHandlerDispatcherActor =
         system()
             .actorOf(
                 RequestHandlerDispatcherActorFactory
-                    .updateBookingRequestHandlerDispatcherActorProps(rollingMonthDatabaseActor),
+                    .updateBookingRequestHandlerDispatcherActorProps(
+                        rollingMonthDatabaseActor, apiErrorMessages),
                 "UpdateBookingRequestHandlerDispatcherActor-" + UUID.randomUUID().toString());
 
     deleteBookingRequestHandlerDispatcherActor =
         system()
             .actorOf(
                 RequestHandlerDispatcherActorFactory
-                    .deleteBookingRequestHandlerDispatcherActorProps(rollingMonthDatabaseActor),
+                    .deleteBookingRequestHandlerDispatcherActorProps(
+                        rollingMonthDatabaseActor, apiErrorMessages),
                 "DeleteBookingRequestHandlerDispatcherActor-" + UUID.randomUUID().toString());
 
     availabilityRequestHandlerDispatcherActor =
         system()
             .actorOf(
                 RequestHandlerDispatcherActorFactory.availabilityRequestHandlerDispatcherActorProps(
-                    rollingMonthDatabaseActor),
+                    rollingMonthDatabaseActor, apiErrorMessages),
                 "AvailabilityRequestHandlerDispatcherActor-" + UUID.randomUUID().toString());
 
     final RouteProvider availabilitiesRouteProvider =
