@@ -106,10 +106,10 @@ public final class VolcanoIslandApp {
   }
 
   private static BookingService getBookingService(
-      final ActorSystem system,
-      final Timeout timeout,
-      final ActorRef rollingMonthDatabaseActor,
-      APIErrorMessages apiErrorMessages) {
+          final ActorSystem system,
+          final Timeout timeout,
+          final ActorRef rollingMonthDatabaseActor,
+          final APIErrorMessages apiErrorMessages) {
     final ActorRef createBookingRequestHandlerDispatcherActor =
         system.actorOf(
             RequestHandlerDispatcherActorFactory.createBookingRequestHandlerDispatcherActorProps(
@@ -136,10 +136,10 @@ public final class VolcanoIslandApp {
   }
 
   private static AvailabilityService getAvailabilityService(
-      final ActorSystem system,
-      final Timeout timeout,
-      final ActorRef rollingMonthDatabaseActor,
-      APIErrorMessages apiErrorMessages) {
+          final ActorSystem system,
+          final Timeout timeout,
+          final ActorRef rollingMonthDatabaseActor,
+          final APIErrorMessages apiErrorMessages) {
     final ActorRef availabilityRequestHandlerDispatcherActor =
         system.actorOf(
             RequestHandlerDispatcherActorFactory.availabilityRequestHandlerDispatcherActorProps(

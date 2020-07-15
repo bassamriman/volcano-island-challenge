@@ -7,7 +7,7 @@ import java.time.LocalDate;
 public final class DateValidator {
 
   // TODO: Use Visitor Pattern & Predicate with result
-  public static DateValidation isValid(
+  public static DateValidation isInValidRange(
       final LocalDate dateToValidate,
       final LocalDate currentDate,
       final BookingConstraints bookingConstraints) {

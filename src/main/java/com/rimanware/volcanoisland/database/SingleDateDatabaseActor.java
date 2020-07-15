@@ -212,7 +212,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
 
   private Receive booked(final Booking booking) {
     return receiveBuilder()
-        // Cancellation will write to disk write away, no need to transactional operation
+        // Cancellation will write to disk right away, no need to transactional operation
         .match(
             SingleDateDatabaseCommand.CancelBooking.class,
             cancelBooking -> {
@@ -223,6 +223,8 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
 
                 // Inform read replica of state change
                 readReplica.tell(cancelBooking, self());
+
+                // Write to disk
                 writeDateDatabaseEventToStream(SingleDateDatabaseEvent.noBooking(), outputStream);
 
                 // Reply to requester
@@ -243,8 +245,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
               // if current booking matches the id of booking to update
               if (updateBooking.getBooking().getId().equals(booking.getId())) {
 
-                // Reply to requester that we awaiting a transaction commit
-                // to persist this change
+                // Reply to requester that we awaiting a transaction commit to persist this change
                 sender.tell(
                     SingleDateDatabaseResponse.probatoryUpdateConfirmation(true, date), self());
 
@@ -269,7 +270,8 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
                   sender().tell(SingleDateDatabaseResponse.isBooked(date), self());
                 } else {
 
-                  // Reply to requester that this date doesn't qualify for an update
+                  // Reply to requester that this date doesn't qualify for an update (not within old
+                  // and updated date ranges )
                   sender.tell(
                       SingleDateDatabaseResponse.doesntQualifyForUpdateConfirmation(date), self());
                 }
@@ -306,6 +308,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
         .match(
             SingleDateDatabaseCommand.Commit.class,
             commit -> {
+              // Commit in memory change to disk if commit message is intended for this date
               if (commit.getDate().equals(date)) {
                 final ActorRef sender = sender();
                 log.info("Persisting : {}", booking);
@@ -326,7 +329,9 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
                 final ActorRef sender = sender();
                 log.info("Reverting : Booking id {}", booking.getId());
 
-                // Inform read replica of state change
+                // If there is no previous booking that got overridden then we need to inform read
+                // replica
+                // that we are undoing that booking and that the date is available
                 if (!maybePreviousBooking.isPresent()) {
                   readReplica.tell(SingleDateDatabaseCommand.cancel(booking.getId()), self());
                 }
@@ -396,7 +401,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
               final ActorRef sender = sender();
               log.info("Booking : {}", book.getBooking());
 
-              // inform read replica of state change
+              // inform read replica of state change, date is now booked
               readReplica.tell(book, self());
 
               final SingleDateDatabaseResponse.BookingConfirmation bookingConfirmation =
@@ -423,7 +428,6 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
                 sender.tell(
                     SingleDateDatabaseResponse.probatoryUpdateConfirmation(false, date), self());
 
-                // Booking date.
                 getContext()
                     .become(
                         transactionalBooked(Optional.empty(), updateBooking.getBooking()), false);
@@ -490,6 +494,10 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
                 final ActorRef sender = sender();
                 log.info("Reverting to previous booking");
 
+                // No need inform replica, as this date used to be booked. When in transactional
+                // state we are also booked.
+                // Read replica is already in the right state.
+
                 // Reply to requester
                 sender.tell(SingleDateDatabaseResponse.revertConfirmation(date), self());
 
@@ -509,7 +517,8 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
             SingleDateDatabaseCommand.UpdateBooking.class,
             updateBooking -> {
               if (updateBooking.getBooking().within(date)) {
-                // This date is booked by another user, inform sender
+                // Date is available but in transaction mode. To prevent other users from booking
+                // this will remain booked until the transaction is committed or reverted.
                 sender().tell(SingleDateDatabaseResponse.isBooked(date), self());
               } else {
                 sender()
@@ -521,7 +530,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
         .match(
             SingleDateDatabaseCommand.CancelBooking.class,
             cancelBooking -> {
-              // Reply to requester
+              // We can't cancel while in transactional state
               sender()
                   .tell(
                       SingleDateDatabaseResponse.doesntQualifyForCancellationConfirmation(date),

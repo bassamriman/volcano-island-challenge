@@ -8,19 +8,14 @@ import akka.event.LoggingAdapter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.rimanware.volcanoisland.common.BookingConstraints;
-import com.rimanware.volcanoisland.common.DateValidator;
-import com.rimanware.volcanoisland.common.LoggingReceiveActor;
-import com.rimanware.volcanoisland.common.Tuple;
+import com.rimanware.volcanoisland.common.*;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import java.util.stream.Stream;
 
 public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
 
@@ -85,21 +80,7 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
 
               // Create all singleDateDatabaseManagerActors one for each day.
               final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor =
-                  reservableDays.stream()
-                      .map(
-                          day -> {
-                            final ActorRef newSingleDateDatabaseActor =
-                                getContext()
-                                    .actorOf(
-                                        singleDateDatabaseActorProps.apply(day, databaseFolderPath),
-                                        "SingleDateDatabaseManagerActor-" + day.toString());
-                            newSingleDateDatabaseActor.tell(
-                                SingleDateDatabaseManagerActor.SingleDateDatabaseManagerCommand
-                                    .start(),
-                                self());
-                            return Tuple.create(day.toString(), newSingleDateDatabaseActor);
-                          })
-                      .collect(ImmutableMap.toImmutableMap(Tuple::getLeft, Tuple::getRight));
+                  createAllSingleDateDatabaseManagerActors(reservableDays);
 
               getContext().become(started(currentDate, dateToSingleDateDatabaseManagerActor));
             })
@@ -115,30 +96,13 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
     return receiveBuilder()
         .match(
             SingleDateDatabaseCommand.Book.class,
-            book -> {
-              final ActorRef sender = sender();
-              final DateValidator.DateValidation validation =
-                  DateValidator.isValid(book.getDate(), currentDate, bookingConstraints);
-
-              if (validation instanceof DateValidator.Valid) {
-                final ActorRef actor =
-                    Optional.ofNullable(
-                            dateToSingleDateDatabaseManagerActor.get(book.getDate().toString()))
-                        .orElseThrow(
-                            () ->
-                                new IllegalStateException(
-                                    "SingleDateDatabase actor reference for "
-                                        + "date "
-                                        + book.getDate()
-                                        + " not found"));
-                actor.forward(book, getContext());
-              } else {
-                final DateValidator.Invalid invalid = (DateValidator.Invalid) validation;
-                sender.tell(
-                    RollingMonthDatabaseResponse.outOfRange(book.getDate(), invalid.getReason()),
-                    self());
-              }
-            })
+            book ->
+                forwardToIntendedDateDatabaseElseReplyToSender(
+                    book.getDate(),
+                    book,
+                    sender(),
+                    dateToSingleDateDatabaseManagerActor,
+                    currentDate))
         .match(
             SingleDateDatabaseCommand.CancelBooking.class,
             cancelBooking -> {
@@ -162,81 +126,31 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
             })
         .match(
             SingleDateDatabaseCommand.Commit.class,
-            commit -> {
-              final ActorRef sender = sender();
-              final DateValidator.DateValidation validation =
-                  DateValidator.isValid(commit.getDate(), currentDate, bookingConstraints);
-              if (validation instanceof DateValidator.Valid) {
-                final ActorRef actor =
-                    Optional.ofNullable(
-                            dateToSingleDateDatabaseManagerActor.get(commit.getDate().toString()))
-                        .orElseThrow(
-                            () ->
-                                new IllegalStateException(
-                                    "SingleDateDatabase actor reference for "
-                                        + "date "
-                                        + commit.getDate()
-                                        + " not found"));
-                actor.forward(commit, getContext());
-              } else {
-                final DateValidator.Invalid invalid = (DateValidator.Invalid) validation;
-                sender.tell(
-                    RollingMonthDatabaseResponse.outOfRange(commit.getDate(), invalid.getReason()),
-                    self());
-              }
-            })
+            commit ->
+                forwardToIntendedDateDatabaseElseReplyToSender(
+                    commit.getDate(),
+                    commit,
+                    sender(),
+                    dateToSingleDateDatabaseManagerActor,
+                    currentDate))
         .match(
             SingleDateDatabaseCommand.Revert.class,
-            revert -> {
-              final ActorRef sender = sender();
-              final DateValidator.DateValidation validation =
-                  DateValidator.isValid(revert.getDate(), currentDate, bookingConstraints);
-              if (validation instanceof DateValidator.Valid) {
-                final ActorRef actor =
-                    Optional.ofNullable(
-                            dateToSingleDateDatabaseManagerActor.get(revert.getDate().toString()))
-                        .orElseThrow(
-                            () ->
-                                new IllegalStateException(
-                                    "SingleDateDatabase actor reference for "
-                                        + "date "
-                                        + revert.getDate()
-                                        + " not found"));
-                actor.forward(revert, getContext());
-              } else {
-                final DateValidator.Invalid invalid = (DateValidator.Invalid) validation;
-                sender.tell(
-                    RollingMonthDatabaseResponse.outOfRange(revert.getDate(), invalid.getReason()),
-                    self());
-              }
-            })
+            revert ->
+                forwardToIntendedDateDatabaseElseReplyToSender(
+                    revert.getDate(),
+                    revert,
+                    sender(),
+                    dateToSingleDateDatabaseManagerActor,
+                    currentDate))
         .match(
             SingleDateDatabaseCommand.GetAvailability.class,
             getAvailability -> {
-              final ActorRef sender = sender();
-              final DateValidator.DateValidation validation =
-                  DateValidator.isValid(getAvailability.getDate(), currentDate, bookingConstraints);
-
-              if (validation instanceof DateValidator.Valid) {
-                final ActorRef actor =
-                    Optional.ofNullable(
-                            dateToSingleDateDatabaseManagerActor.get(
-                                getAvailability.getDate().toString()))
-                        .orElseThrow(
-                            () ->
-                                new IllegalStateException(
-                                    "SingleDateDatabase actor reference for "
-                                        + "date "
-                                        + getAvailability.getDate()
-                                        + " not found"));
-                actor.forward(getAvailability, getContext());
-              } else {
-                final DateValidator.Invalid invalid = (DateValidator.Invalid) validation;
-                sender.tell(
-                    RollingMonthDatabaseResponse.outOfRange(
-                        getAvailability.getDate(), invalid.getReason()),
-                    self());
-              }
+              forwardToIntendedDateDatabaseElseReplyToSender(
+                  getAvailability.getDate(),
+                  getAvailability,
+                  sender(),
+                  dateToSingleDateDatabaseManagerActor,
+                  currentDate);
             })
         .match(
             RollingMonthDatabaseCommand.GetQueryableDates.class,
@@ -259,19 +173,44 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
         .build();
   }
 
+  private <Message> void forwardToIntendedDateDatabaseElseReplyToSender(
+          final LocalDate date,
+          final Message msg,
+          final ActorRef sender,
+          final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor,
+          final LocalDate currentDate) {
+
+    final DateValidator.DateValidation validation =
+        DateValidator.isInValidRange(date, currentDate, bookingConstraints);
+
+    if (validation instanceof DateValidator.Valid) {
+      final ActorRef destination = singleDateDatabaseOf(dateToSingleDateDatabaseManagerActor, date);
+      destination.forward(msg, getContext());
+    } else {
+      final DateValidator.Invalid invalid = (DateValidator.Invalid) validation;
+      sender.tell(RollingMonthDatabaseResponse.outOfRange(date, invalid.getReason()), self());
+    }
+  }
+
+  private ActorRef singleDateDatabaseOf(
+          final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor, final LocalDate date) {
+    return Optional.ofNullable(dateToSingleDateDatabaseManagerActor.get(date.toString()))
+        .orElseThrow(() -> singleDateDatabaseActorReferenceNotFoundFor(date));
+  }
+
+  private IllegalStateException singleDateDatabaseActorReferenceNotFoundFor(final LocalDate date) {
+    return new IllegalStateException(
+        "SingleDateDatabase actor reference for " + "date " + date + " not found");
+  }
+
   private RollingMonthDatabaseResponse.RequestedDatesOutOfRange
       extractOutOfRangeErrorsFromUpdateBooking(
           final LocalDate currentDate,
           final SingleDateDatabaseCommand.UpdateBooking updateBooking) {
     final ImmutableSet<LocalDate> daysToBook =
-        Stream.iterate(updateBooking.getBooking().getArrivalDate(), d -> d.plusDays(1))
-            .limit(
-                ChronoUnit.DAYS.between(
-                    updateBooking.getBooking().getArrivalDate(),
-                    // Increment by one because ChronoUnit.DAYS.between API
-                    // to date is exclusive
-                    updateBooking.getBooking().getDepartureDate().plusDays(1)))
-            .collect(ImmutableSet.toImmutableSet());
+        UtilityFunctions.generateAllDatesInRange(
+            updateBooking.getBooking().getArrivalDate(),
+            updateBooking.getBooking().getDepartureDate());
 
     return RollingMonthDatabaseResponse.outOfRange(
         daysToBook.stream()
@@ -279,7 +218,7 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
                 dateToBook ->
                     Tuple.create(
                         dateToBook,
-                        DateValidator.isValid(dateToBook, currentDate, bookingConstraints)))
+                        DateValidator.isInValidRange(dateToBook, currentDate, bookingConstraints)))
             .filter(tuple -> tuple.getRight() instanceof DateValidator.Invalid)
             .map(tuple -> Tuple.create(tuple.getLeft(), (DateValidator.Invalid) tuple.getRight()))
             .map(
@@ -289,10 +228,25 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
             .collect(ImmutableList.toImmutableList()));
   }
 
+  private ImmutableMap<String, ActorRef> createAllSingleDateDatabaseManagerActors(
+          final ImmutableList<LocalDate> reservableDays) {
+    return reservableDays.stream()
+        .map(
+            day -> {
+              final ActorRef newSingleDateDatabaseActor =
+                  getContext()
+                      .actorOf(
+                          singleDateDatabaseActorProps.apply(day, databaseFolderPath),
+                          "SingleDateDatabaseManagerActor-" + day.toString());
+              newSingleDateDatabaseActor.tell(
+                  SingleDateDatabaseManagerActor.SingleDateDatabaseManagerCommand.start(), self());
+              return Tuple.create(day.toString(), newSingleDateDatabaseActor);
+            })
+        .collect(ImmutableMap.toImmutableMap(Tuple::getLeft, Tuple::getRight));
+  }
+
   @Override
   public Receive createReceive() {
-    // Defaults to available as the original date database will inform it eventually of initial
-    // state
     return inactive();
   }
 }

@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /** Booking is a data model that a booking id to a user */
-public class Booking implements Serializable {
+public final class Booking implements Serializable {
   private final String id;
   private final String email;
   private final String fullName;

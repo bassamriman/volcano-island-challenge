@@ -59,8 +59,7 @@ public final class SingleDateDatabaseReadReplicaActor extends LoggingReceiveActo
 
   @Override
   public Receive createReceive() {
-    // Defaults to available as the original date database will inform it eventually of initial
-    // state
+    // Defaults to available as the writer database will inform it eventually of initial state
     return available();
   }
 }

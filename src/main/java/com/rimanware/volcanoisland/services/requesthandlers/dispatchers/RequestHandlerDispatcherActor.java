@@ -17,11 +17,11 @@ public final class RequestHandlerDispatcherActor<Request> extends LoggingReceive
   private final Class<Request> requestType;
 
   private RequestHandlerDispatcherActor(
-      ActorRef database,
-      APIErrorMessages apiErrorMessages,
-      TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
-      Supplier<String> requestHandlerActorNameGenerator,
-      Class<Request> requestType) {
+          final ActorRef database,
+          final APIErrorMessages apiErrorMessages,
+          final TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
+          final Supplier<String> requestHandlerActorNameGenerator,
+          final Class<Request> requestType) {
     this.database = database;
     this.apiErrorMessages = apiErrorMessages;
     this.requestHandlerActorProps = requestHandlerActorProps;
@@ -47,11 +47,11 @@ public final class RequestHandlerDispatcherActor<Request> extends LoggingReceive
   }
 
   public static <Request> RequestHandlerDispatcherActor<Request> create(
-      ActorRef database,
-      APIErrorMessages apiErrorMessages,
-      TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
-      Supplier<String> requestHandlerActorNameGenerator,
-      Class<Request> requestType) {
+          final ActorRef database,
+          final APIErrorMessages apiErrorMessages,
+          final TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
+          final Supplier<String> requestHandlerActorNameGenerator,
+          final Class<Request> requestType) {
     return new RequestHandlerDispatcherActor<Request>(
         database,
         apiErrorMessages,

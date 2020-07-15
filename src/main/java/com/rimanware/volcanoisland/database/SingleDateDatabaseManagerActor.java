@@ -84,7 +84,7 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
             SingleDateDatabaseCommand.Book.class,
             book -> {
               // Store request before asking the read replica if date is available,
-              // this is an optimisation to reduce load database writer
+              // this is an optimisation to reduce load on the writer database.
               final Request request = Request.create(sender(), book);
               final ImmutableList<Request> newRequests =
                   UtilityFunctions.addToImmutableList(requests, request);
@@ -94,31 +94,31 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
         .match(
             SingleDateDatabaseCommand.UpdateBooking.class,
             updateBooking -> {
-              // We want to updates to go to writer right away as it's high priority.
+              // We want to updates to go to writer database right away as it's high priority.
               writeReadActor.forward(updateBooking, getContext());
             })
         .match(
             SingleDateDatabaseCommand.CancelBooking.class,
             cancelBooking -> {
-              // We want to cancellations to go to writer right away as it's high priority.
+              // We want to cancellations to go to writer database right away as it's high priority.
               writeReadActor.forward(cancelBooking, getContext());
             })
         .match(
             SingleDateDatabaseCommand.Commit.class,
             commit -> {
-              // We want to commits to go to writer right away as it's high priority.
+              // We want to commits to go to writer right database away as it's high priority.
               writeReadActor.forward(commit, getContext());
             })
         .match(
             SingleDateDatabaseCommand.Revert.class,
             revert -> {
-              // We want to reverts to go to writer right away as it's high priority.
+              // We want to reverts to go to writer right database away as it's high priority.
               writeReadActor.forward(revert, getContext());
             })
         .match(
             SingleDateDatabaseCommand.GetAvailability.class,
-            // Forward to read replica to remove load from writer date database. We expect more
-            // reads than write.
+            // Forward to read replica to remove load from writer database. We expect more
+            // reads than write. Will help keep IO threads only for writing file tasks.
             getAvailability -> readReplicaActor.forward(getAvailability, getContext()))
         .match(
             SingleDateDatabaseResponse.IsAvailable.class,
@@ -158,7 +158,7 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
         .match(
             Deactivate.class,
             deactivate -> {
-              // Kill children
+              // Kill children (writer and read replica)
               writeReadActor.tell(PoisonPill.getInstance(), self());
               readReplicaActor.tell(PoisonPill.getInstance(), self());
               getContext().become(inactive());
@@ -169,8 +169,6 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
 
   @Override
   public Receive createReceive() {
-    // Defaults to available as the original date database will inform it eventually of initial
-    // state
     return inactive();
   }
 
