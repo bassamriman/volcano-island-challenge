@@ -1,6 +1,8 @@
 package com.rimanware.volcanoisland.nonfunctionaltests;
 
 import akka.actor.ActorRef;
+import akka.actor.ActorSystem;
+import akka.http.javadsl.marshallers.jackson.Jackson;
 import akka.http.javadsl.model.HttpRequest;
 import akka.http.javadsl.model.StatusCodes;
 import akka.http.javadsl.testkit.TestRouteResult;
@@ -8,9 +10,11 @@ import com.google.common.collect.ImmutableList;
 import com.rimanware.volcanoisland.common.BookingConstraints;
 import com.rimanware.volcanoisland.common.RequesterTestActor;
 import com.rimanware.volcanoisland.common.RoutesTester;
+import com.rimanware.volcanoisland.common.Tuple;
 import com.rimanware.volcanoisland.database.RollingMonthDatabaseActor;
 import com.rimanware.volcanoisland.database.SingleDateDatabaseManagerActor;
 import com.rimanware.volcanoisland.services.models.responses.Availabilities;
+import com.rimanware.volcanoisland.services.models.responses.BookingConfirmation;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.junit.Assert;
@@ -23,6 +27,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static akka.pattern.PatternsCS.ask;
 
@@ -31,7 +37,7 @@ public class ConcurrencyTest extends RoutesTester {
   protected static final String dataBasePath = "test-database";
 
   @Test
-  public void multiCreateShouldBeHandlerGracefully()
+  public void multiCreateBookingShouldSucceedWithOnlyOneSuccessfulWriteGivenTheyOverlap()
       throws ExecutionException, InterruptedException {
 
     final LocalDate date =
@@ -50,6 +56,7 @@ public class ConcurrencyTest extends RoutesTester {
         ask(firstRequester, RequesterTestActor.start(), timeout)
             .thenApply((TestRouteResult.class::cast))
             .toCompletableFuture();
+
     final CompletableFuture<TestRouteResult> secondRequesterResultFuture =
         ask(secondRequester, RequesterTestActor.start(), timeout)
             .thenApply((TestRouteResult.class::cast))
@@ -64,6 +71,7 @@ public class ConcurrencyTest extends RoutesTester {
 
     final List<TestRouteResult> results = combinedDataCompletionStage.toCompletableFuture().get();
 
+    // Assert
     final ImmutableList<Integer> statusCode =
         results.stream().map(TestRouteResult::statusCode).collect(ImmutableList.toImmutableList());
 
@@ -73,8 +81,177 @@ public class ConcurrencyTest extends RoutesTester {
     Assert.assertTrue(
         "Should contain at least one failed request",
         statusCode.contains(StatusCodes.BAD_REQUEST.intValue()));
+  }
 
-    final Availabilities availabilities = getAvailabilities(date.minusDays(1), date.plusDays(1));
+  @Test
+  public void bookingAllThirtyDaysConcurrentlyShouldSucceedConcurrentlyGivenTheyDontOverlap()
+      throws ExecutionException, InterruptedException {
+
+    // Initialize all requesters
+    final ImmutableList<ActorRef> requesters =
+        bookingConstraints.generateAllReservableDays(currentDate).stream()
+            .map(
+                bookingDate -> {
+                  final HttpRequest request = createRequest(bookingDate, bookingDate);
+                  final ActorRef requester =
+                      system().actorOf(RequesterTestActor.props(volcanoIslandApp, request));
+                  return requester;
+                })
+            .collect(ImmutableList.toImmutableList());
+
+    // Execute all requests at the same time
+    final ImmutableList<CompletableFuture<TestRouteResult>> resultFutures =
+        requesters.stream()
+            .map(
+                requester ->
+                    ask(requester, RequesterTestActor.start(), timeout)
+                        .thenApply((TestRouteResult.class::cast))
+                        .toCompletableFuture())
+            .collect(ImmutableList.toImmutableList());
+
+    final CompletionStage<List<TestRouteResult>> combinedDataCompletionStage =
+        waitOnAll(resultFutures);
+
+    final List<TestRouteResult> results = combinedDataCompletionStage.toCompletableFuture().get();
+
+    final ImmutableList<Integer> statusCode =
+        results.stream().map(TestRouteResult::statusCode).collect(ImmutableList.toImmutableList());
+
+    // Assert
+    Assert.assertTrue(
+        "Should contain at least one successful request",
+        statusCode.contains(StatusCodes.CREATED.intValue()));
+    Assert.assertFalse(
+        "Should contain at least one failed request",
+        statusCode.contains(StatusCodes.BAD_REQUEST.intValue()));
+
+    final Availabilities allAvailabilities =
+        getAvailabilities(
+            bookingConstraints.startDateOfReservationWindowGivenCurrentDate(currentDate),
+            bookingConstraints.endDateOfReservationWindowGivenCurrentDate(currentDate));
+
+    Assert.assertTrue("All date should be booked", allAvailabilities.getAvailabilities().isEmpty());
+
+    // Kill all requesters
+    requesters.forEach(requester -> system().stop(requester));
+  }
+
+  @Test
+  /**
+   * This a Benchmark test. DON'T TRY THIS AT HOME. This shouldn't be a unit test as there is a lot
+   * of randomness. This should be a regression test that runs 100 time and taking the average. This
+   * proves that the app can write 30 request concurrently.
+   */
+  public void bookingAllThirtyDaysConcurrentlyShouldNotScaleWithTheAmountOfBooking() {
+
+    final long maxScaleFactor = 3;
+    final ActorSystem requesterActorSystem = ActorSystem.apply("Test");
+
+    // Create first booking for benchmarking
+    final LocalDate createArrivalDate =
+        bookingConstraints.startDateOfReservationWindowGivenCurrentDate(currentDate).plusDays(1);
+    final LocalDate createDepartureDate = createArrivalDate.plusDays(2);
+
+    // ----------------------------
+    // WARM-UP BOOKING
+    // ----------------------------
+    final BookingConfirmation warmUpBookingConfirmation =
+        createBookingWithConfirmation(createArrivalDate, createDepartureDate);
+    // Delete booking
+    deleteBooking(warmUpBookingConfirmation);
+
+    // ----------------------------
+    // SINGLE BOOKING BENCHMARK
+    // ----------------------------
+    final Tuple<BookingConfirmation, Long> bookingConfirmationWithTime =
+        timedInMilliseconds(
+            () -> createBookingWithConfirmation(createArrivalDate, createDepartureDate));
+
+    final BookingConfirmation bookingConfirmation = bookingConfirmationWithTime.getLeft();
+    final Long singleBookingDurationInMilliseconds = bookingConfirmationWithTime.getRight();
+    // Delete booking
+    deleteBooking(bookingConfirmation);
+
+    // ----------------------------
+    // MULTIPLE BOOKING BENCHMARK
+    // ----------------------------
+    // Initialize all requesters
+    final ImmutableList<ActorRef> requesters =
+        bookingConstraints.generateAllReservableDays(currentDate).stream()
+            .map(
+                bookingDate -> {
+                  final HttpRequest request = createRequest(bookingDate, bookingDate);
+                  return requesterActorSystem.actorOf(
+                      RequesterTestActor.props(volcanoIslandApp, request));
+                })
+            .collect(ImmutableList.toImmutableList());
+
+    // Execute all requests at the same time
+    final Tuple<List<TestRouteResult>, Long> testRouteResultWithTime =
+        timedInMilliseconds(() -> startExecuting(requesters));
+
+    final Long thirtyBookingDurationInMilliseconds = testRouteResultWithTime.getRight();
+
+    Assert.assertTrue(
+        "The execution time should not scale with amount of booking",
+        thirtyBookingDurationInMilliseconds
+            < (singleBookingDurationInMilliseconds
+                * bookingConstraints.generateAllReservableDays(currentDate).size()
+                / maxScaleFactor));
+
+    // Kill all requester actor system
+    requesterActorSystem.terminate();
+  }
+
+  private void deleteBooking(BookingConfirmation warmUpBookingConfirmation) {
+    volcanoIslandApp
+        .run(
+            HttpRequest.DELETE("/bookings/" + warmUpBookingConfirmation.getBookingConfirmationId()))
+        .assertStatusCode(StatusCodes.OK);
+  }
+
+  private BookingConfirmation createBookingWithConfirmation(
+      LocalDate createArrivalDate, LocalDate createDepartureDate) {
+    return volcanoIslandApp
+        .run(createRequest(createArrivalDate, createDepartureDate))
+        .assertStatusCode(StatusCodes.CREATED)
+        .entity(Jackson.unmarshaller(BookingConfirmation.class));
+  }
+
+  private List<TestRouteResult> startExecuting(ImmutableList<ActorRef> requesters) {
+    final ImmutableList<CompletableFuture<TestRouteResult>> resultFutures =
+        requesters.stream()
+            .map(
+                requester ->
+                    ask(requester, RequesterTestActor.start(), timeout)
+                        .thenApply((TestRouteResult.class::cast))
+                        .toCompletableFuture())
+            .collect(ImmutableList.toImmutableList());
+
+    final CompletionStage<List<TestRouteResult>> combinedDataCompletionStage =
+        waitOnAll(resultFutures);
+
+    try {
+      return combinedDataCompletionStage.toCompletableFuture().get();
+    } catch (InterruptedException | ExecutionException e) {
+      e.printStackTrace();
+    }
+    return ImmutableList.of();
+  }
+
+  private <T> Tuple<T, Long> timedInMilliseconds(Supplier<T> function) {
+    long startTime = System.nanoTime();
+    T result = function.get();
+    long endTime = System.nanoTime();
+    long timeElapsed = endTime - startTime;
+    return Tuple.create(result, timeElapsed / 1000000);
+  }
+
+  private <T> CompletableFuture<List<T>> waitOnAll(List<CompletableFuture<T>> futuresList) {
+    CompletableFuture<Void> allFuturesResult =
+        CompletableFuture.allOf(futuresList.toArray(new CompletableFuture[futuresList.size()]));
+    return allFuturesResult.thenApply(
+        v -> futuresList.stream().map(future -> future.join()).collect(Collectors.<T>toList()));
   }
 
   @Override
@@ -84,7 +261,7 @@ public class ConcurrencyTest extends RoutesTester {
 
   @Override
   public void initialize() {
-    // On Disk DataBase
+    // On Disk Database
     rollingMonthDatabaseActor =
         system()
             .actorOf(
@@ -96,14 +273,4 @@ public class ConcurrencyTest extends RoutesTester {
 
     initializeRoutes(rollingMonthDatabaseActor);
   }
-
-  /*
-  @AfterClass
-  public static void afterClass() throws InterruptedException, IOException {
-    // This is bad, but a shortcut for the sake of time
-    // We have to wait for the actors to die before deleting the folder
-    Thread.sleep(20000);
-    FileUtils.forceDelete(new File(dataBasePath));
-  }
-   */
 }
