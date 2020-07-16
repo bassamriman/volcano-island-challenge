@@ -2,8 +2,9 @@ package com.rimanware.volcanoisland.errors;
 
 import akka.http.javadsl.model.StatusCode;
 import akka.http.javadsl.model.StatusCodes;
+import com.rimanware.volcanoisland.errors.api.APIError;
 
-public enum APIError {
+public enum APIErrorImpl implements APIError {
   AlreadyBooked("ALREADY_BOOKED", StatusCodes.BAD_REQUEST),
   AlreadyOccurred("ALREADY_OCCURRED", StatusCodes.BAD_REQUEST),
   MinimumAheadOfArrivalError("MINIMUM_AHEAD_OF_ARRIVAL_ERROR", StatusCodes.BAD_REQUEST),
@@ -18,15 +19,17 @@ public enum APIError {
   private final String key;
   private final StatusCode httpStatusCode;
 
-  APIError(final String key, final StatusCode httpStatusCode) {
+  APIErrorImpl(final String key, final StatusCode httpStatusCode) {
     this.key = key;
     this.httpStatusCode = httpStatusCode;
   }
 
+  @Override
   public String getKey() {
     return key;
   }
 
+  @Override
   public StatusCode getHttpStatusCode() {
     return httpStatusCode;
   }

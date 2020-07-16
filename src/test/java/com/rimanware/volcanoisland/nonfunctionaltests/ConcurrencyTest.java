@@ -7,7 +7,7 @@ import akka.http.javadsl.model.HttpRequest;
 import akka.http.javadsl.model.StatusCodes;
 import akka.http.javadsl.testkit.TestRouteResult;
 import com.google.common.collect.ImmutableList;
-import com.rimanware.volcanoisland.common.BookingConstraints;
+import com.rimanware.volcanoisland.business.BookingConstraintsImpl;
 import com.rimanware.volcanoisland.common.RequesterTestActor;
 import com.rimanware.volcanoisland.common.RoutesTester;
 import com.rimanware.volcanoisland.common.Tuple;
@@ -211,7 +211,7 @@ public class ConcurrencyTest extends RoutesTester {
   }
 
   private BookingConfirmation createBookingWithConfirmation(
-          final LocalDate createArrivalDate, final LocalDate createDepartureDate) {
+      final LocalDate createArrivalDate, final LocalDate createDepartureDate) {
     return volcanoIslandApp
         .run(createRequest(createArrivalDate, createDepartureDate))
         .assertStatusCode(StatusCodes.CREATED)
@@ -251,7 +251,7 @@ public class ConcurrencyTest extends RoutesTester {
     final CompletableFuture<Void> allFuturesResult =
         CompletableFuture.allOf(futuresList.toArray(new CompletableFuture[futuresList.size()]));
     return allFuturesResult.thenApply(
-        v -> futuresList.stream().map(future -> future.join()).collect(Collectors.<T>toList()));
+        v -> futuresList.stream().map(future -> future.join()).collect(Collectors.toList()));
   }
 
   @Override
@@ -267,7 +267,7 @@ public class ConcurrencyTest extends RoutesTester {
             .actorOf(
                 RollingMonthDatabaseActor.props(
                     dataBasePath + "/test-" + UUID.randomUUID().toString(),
-                    BookingConstraints.INSTANCE,
+                    BookingConstraintsImpl.INSTANCE,
                     SingleDateDatabaseManagerActor::props),
                 "RollingMonthDatabaseActor-" + UUID.randomUUID().toString());
 

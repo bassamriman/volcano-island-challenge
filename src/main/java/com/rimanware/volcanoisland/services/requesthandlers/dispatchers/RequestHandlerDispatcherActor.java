@@ -4,7 +4,7 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import com.rimanware.volcanoisland.common.LoggingReceiveActor;
 import com.rimanware.volcanoisland.common.TriFunction;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerCommand;
 
 import java.util.function.Supplier;
@@ -17,11 +17,11 @@ public final class RequestHandlerDispatcherActor<Request> extends LoggingReceive
   private final Class<Request> requestType;
 
   private RequestHandlerDispatcherActor(
-          final ActorRef database,
-          final APIErrorMessages apiErrorMessages,
-          final TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
-          final Supplier<String> requestHandlerActorNameGenerator,
-          final Class<Request> requestType) {
+      final ActorRef database,
+      final APIErrorMessages apiErrorMessages,
+      final TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
+      final Supplier<String> requestHandlerActorNameGenerator,
+      final Class<Request> requestType) {
     this.database = database;
     this.apiErrorMessages = apiErrorMessages;
     this.requestHandlerActorProps = requestHandlerActorProps;
@@ -47,11 +47,11 @@ public final class RequestHandlerDispatcherActor<Request> extends LoggingReceive
   }
 
   public static <Request> RequestHandlerDispatcherActor<Request> create(
-          final ActorRef database,
-          final APIErrorMessages apiErrorMessages,
-          final TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
-          final Supplier<String> requestHandlerActorNameGenerator,
-          final Class<Request> requestType) {
+      final ActorRef database,
+      final APIErrorMessages apiErrorMessages,
+      final TriFunction<Request, APIErrorMessages, ActorRef, Props> requestHandlerActorProps,
+      final Supplier<String> requestHandlerActorNameGenerator,
+      final Class<Request> requestType) {
     return new RequestHandlerDispatcherActor<Request>(
         database,
         apiErrorMessages,

@@ -8,7 +8,7 @@ import com.rimanware.volcanoisland.common.UtilityFunctions;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseResponse;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.requests.AvailabilitiesRequest;
 import com.rimanware.volcanoisland.services.models.responses.Availabilities;
 import com.rimanware.volcanoisland.services.models.responses.Availability;

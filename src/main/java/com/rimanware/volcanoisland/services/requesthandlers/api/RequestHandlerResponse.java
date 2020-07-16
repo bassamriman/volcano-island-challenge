@@ -2,8 +2,8 @@ package com.rimanware.volcanoisland.services.requesthandlers.api;
 
 import akka.http.javadsl.model.StatusCode;
 import akka.http.scaladsl.model.StatusCodes;
-import com.rimanware.volcanoisland.errors.APIError;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.api.APIError;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.responses.Availabilities;
 import com.rimanware.volcanoisland.services.models.responses.BookingConfirmation;
 import com.rimanware.volcanoisland.services.models.responses.DateErrors;

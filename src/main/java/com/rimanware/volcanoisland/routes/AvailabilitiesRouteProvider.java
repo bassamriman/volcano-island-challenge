@@ -3,9 +3,9 @@ package com.rimanware.volcanoisland.routes;
 import akka.http.javadsl.marshallers.jackson.Jackson;
 import akka.http.javadsl.model.StatusCodes;
 import akka.http.javadsl.server.Route;
-import com.rimanware.volcanoisland.common.BookingConstraints;
+import com.rimanware.volcanoisland.business.BookingConstraintsImpl;
 import com.rimanware.volcanoisland.common.DateValidator;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.api.AvailabilityService;
 import com.rimanware.volcanoisland.services.models.requests.AvailabilitiesRequest;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerResponse;
@@ -15,24 +15,17 @@ import java.util.function.Function;
 
 public final class AvailabilitiesRouteProvider extends RouteProviderWithValidation {
   private final AvailabilityService availabilityService;
-  private final BookingConstraints bookingConstraints;
   private final APIErrorMessages apiErrorMessages;
 
   private AvailabilitiesRouteProvider(
-      final AvailabilityService availabilityService,
-      final BookingConstraints bookingConstraints,
-      final APIErrorMessages apiErrorMessages) {
+      final AvailabilityService availabilityService, final APIErrorMessages apiErrorMessages) {
     this.availabilityService = availabilityService;
-    this.bookingConstraints = bookingConstraints;
     this.apiErrorMessages = apiErrorMessages;
   }
 
   public static AvailabilitiesRouteProvider create(
-      final AvailabilityService availabilityService,
-      final BookingConstraints bookingConstraints,
-      final APIErrorMessages apiErrorMessages) {
-    return new AvailabilitiesRouteProvider(
-        availabilityService, bookingConstraints, apiErrorMessages);
+      final AvailabilityService availabilityService, final APIErrorMessages apiErrorMessages) {
+    return new AvailabilitiesRouteProvider(availabilityService, apiErrorMessages);
   }
 
   @Override
@@ -68,7 +61,7 @@ public final class AvailabilitiesRouteProvider extends RouteProviderWithValidati
         availabilitiesRequest,
         (request) ->
             DateValidator.availabilitiesDateRangeIsValid(
-                request.getStartDate(), request.getEndDate(), BookingConstraints.INSTANCE),
+                request.getStartDate(), request.getEndDate(), BookingConstraintsImpl.INSTANCE),
         requestHandler,
         StatusCodes.OK);
   }

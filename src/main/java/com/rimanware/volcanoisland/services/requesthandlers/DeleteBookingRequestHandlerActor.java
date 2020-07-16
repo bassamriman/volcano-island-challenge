@@ -8,8 +8,8 @@ import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseResponse;
-import com.rimanware.volcanoisland.errors.APIError;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.APIErrorImpl;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.responses.BookingConfirmation;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerCommand;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerResponse;
@@ -118,7 +118,7 @@ public final class DeleteBookingRequestHandlerActor
   protected RequestHandlerResponse createResponse(final DeleteRequestState deleteRequestState) {
     if (deleteRequestState.getCancelledDates().isEmpty()) {
       return RequestHandlerResponse.Failure.failed(
-          APIError.BookingIdNotFoundError, apiErrorMessages);
+          APIErrorImpl.BookingIdNotFoundError, apiErrorMessages);
     } else {
       return RequestHandlerResponse.Success.succeeded(BookingConfirmation.create(bookingId));
     }

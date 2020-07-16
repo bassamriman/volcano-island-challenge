@@ -5,7 +5,7 @@ import akka.http.javadsl.model.HttpRequest;
 import akka.http.javadsl.model.MediaTypes;
 import akka.http.javadsl.model.StatusCodes;
 import com.rimanware.volcanoisland.common.RoutesTester;
-import com.rimanware.volcanoisland.errors.APIError;
+import com.rimanware.volcanoisland.errors.APIErrorImpl;
 import com.rimanware.volcanoisland.services.models.responses.Availabilities;
 import com.rimanware.volcanoisland.services.models.responses.SimpleError;
 import org.junit.Assert;
@@ -36,7 +36,7 @@ public final class GetAvailabilitiesTests extends RoutesTester {
         .assertStatusCode(StatusCodes.BAD_REQUEST)
         .assertEntityAs(
             Jackson.unmarshaller(SimpleError.class),
-            SimpleError.create(APIError.EndDateIsBeforeStartDateError, apiErrorMessages));
+            SimpleError.create(APIErrorImpl.EndDateIsBeforeStartDateError, apiErrorMessages));
   }
 
   @Test

@@ -10,7 +10,7 @@ import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseResponse;
 import com.rimanware.volcanoisland.database.models.Booking;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.requests.BookingRequest;
 import com.rimanware.volcanoisland.services.models.responses.BookingConfirmation;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerCommand;
@@ -54,6 +54,11 @@ public final class CreateBookingRequestHandlerActor
         () -> CreateBookingRequestHandlerActor.create(bookingRequest, apiErrorMessages, database));
   }
 
+  private static ImmutableList<LocalDate> datesToRollBack(
+      final BookingRequestState bookingRequestState) {
+    return bookingRequestState.getNewlyBookedDates();
+  }
+
   @Override
   public AbstractActor.Receive createReceive() {
     return inactive();
@@ -86,11 +91,6 @@ public final class CreateBookingRequestHandlerActor
             })
         .matchAny(o -> log.info("received unknown message"))
         .build();
-  }
-
-  private static ImmutableList<LocalDate> datesToRollBack(
-      final BookingRequestState bookingRequestState) {
-    return bookingRequestState.getNewlyBookedDates();
   }
 
   @Override

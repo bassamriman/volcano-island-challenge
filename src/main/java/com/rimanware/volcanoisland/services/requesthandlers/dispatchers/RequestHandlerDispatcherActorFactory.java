@@ -2,7 +2,7 @@ package com.rimanware.volcanoisland.services.requesthandlers.dispatchers;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.requests.AvailabilitiesRequest;
 import com.rimanware.volcanoisland.services.models.requests.BookingRequest;
 import com.rimanware.volcanoisland.services.models.requests.UpdateBookingRequest;
@@ -15,13 +15,22 @@ import java.util.UUID;
 
 public final class RequestHandlerDispatcherActorFactory {
 
+  public static final String AVAILABILITY_REQUEST_HANDLER_ACTOR =
+      "AvailabilityRequestHandlerActor-";
+  public static final String CREATE_BOOKING_REQUEST_HANDLER_ACTOR =
+      "CreateBookingRequestHandlerActor-";
+  public static final String UPDATE_BOOKING_REQUEST_HANDLER_ACTOR =
+      "UpdateBookingRequestHandlerActor";
+  public static final String DELETE_BOOKING_REQUEST_HANDLER_ACTOR =
+      "DeleteBookingRequestHandlerActor-";
+
   public static Props availabilityRequestHandlerDispatcherActorProps(
       final ActorRef database, final APIErrorMessages apiErrorMessages) {
     return RequestHandlerDispatcherActor.props(
         database,
         apiErrorMessages,
         AvailabilityRequestHandlerActor::props,
-        () -> "AvailabilityRequestHandlerActor-" + UUID.randomUUID().toString(),
+        () -> AVAILABILITY_REQUEST_HANDLER_ACTOR + UUID.randomUUID().toString(),
         AvailabilitiesRequest.class);
   }
 
@@ -31,7 +40,7 @@ public final class RequestHandlerDispatcherActorFactory {
         database,
         apiErrorMessages,
         CreateBookingRequestHandlerActor::props,
-        () -> "CreateBookingRequestHandlerActor-" + UUID.randomUUID().toString(),
+        () -> CREATE_BOOKING_REQUEST_HANDLER_ACTOR + UUID.randomUUID().toString(),
         BookingRequest.class);
   }
 
@@ -41,7 +50,7 @@ public final class RequestHandlerDispatcherActorFactory {
         database,
         apiErrorMessages,
         UpdateBookingRequestHandlerActor::props,
-        () -> "UpdateBookingRequestHandlerActor-" + UUID.randomUUID().toString(),
+        () -> UPDATE_BOOKING_REQUEST_HANDLER_ACTOR + "-" + UUID.randomUUID().toString(),
         UpdateBookingRequest.class);
   }
 
@@ -51,7 +60,7 @@ public final class RequestHandlerDispatcherActorFactory {
         database,
         apiErrorMessages,
         DeleteBookingRequestHandlerActor::props,
-        () -> "DeleteBookingRequestHandlerActor-" + UUID.randomUUID().toString(),
+        () -> DELETE_BOOKING_REQUEST_HANDLER_ACTOR + UUID.randomUUID().toString(),
         String.class);
   }
 }

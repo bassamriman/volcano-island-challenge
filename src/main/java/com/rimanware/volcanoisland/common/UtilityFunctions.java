@@ -41,7 +41,7 @@ public final class UtilityFunctions {
   }
 
   public static ImmutableSet<LocalDate> generateAllDatesInRange(
-          final LocalDate startDate, final LocalDate endDate) {
+      final LocalDate startDate, final LocalDate endDate) {
     return Stream.iterate(startDate, d -> d.plusDays(1))
         .limit(
             ChronoUnit.DAYS.between(

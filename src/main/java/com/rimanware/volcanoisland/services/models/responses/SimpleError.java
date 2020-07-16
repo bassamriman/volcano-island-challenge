@@ -3,8 +3,8 @@ package com.rimanware.volcanoisland.services.models.responses;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.rimanware.volcanoisland.errors.APIError;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.api.APIError;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 
 import java.util.Objects;
 

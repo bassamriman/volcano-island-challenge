@@ -18,12 +18,15 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 public final class SingleDateDatabaseActor extends LoggingReceiveActor {
-  private static final String SingleDateDatabaseCorruptedErrorMessage =
+  private static final String SINGLE_DATE_DATABASE_CORRUPTED_ERROR_MESSAGE =
       "SingleDateDatabase file not properly initialized or is corrupted. "
           + "File should contain at least one event. "
           + "File should be initialized with NoBooking DateDatabaseEvent.";
-  private static final String SingleDateDatabaseDoesntExistErrorMessage =
+  private static final String SINGLE_DATE_DATABASE_FILE_DOESN_T_EXIST_NEEDS_TO_BE_CREATED =
       "SingleDateDatabase file doesn't exist. Needs to be created";
+  public static final String
+      ERROR_OCCURRED_WHILE_WRITING_DATE_DATABASE_EVENT_TO_OBJECT_OUTPUT_STREAM =
+          "Error occurred while writing DateDatabaseEvent to ObjectOutputStream: ";
   private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
   private final LocalDate date;
   private final Receive initialBehaviour;
@@ -85,7 +88,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
                   try {
                     return new ObjectInputStream(inputStreamSupplier.get());
                   } catch (final IOException e) {
-                    throw new IllegalStateException(SingleDateDatabaseCorruptedErrorMessage);
+                    throw new IllegalStateException(SINGLE_DATE_DATABASE_CORRUPTED_ERROR_MESSAGE);
                   }
                 },
                 readReplica));
@@ -114,7 +117,8 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
           try {
             return new FileInputStream(singleDateDatabaseFilePath);
           } catch (final FileNotFoundException e) {
-            throw new IllegalStateException(SingleDateDatabaseDoesntExistErrorMessage);
+            throw new IllegalStateException(
+                SINGLE_DATE_DATABASE_FILE_DOESN_T_EXIST_NEEDS_TO_BE_CREATED);
           }
         },
         readReplica);
@@ -167,11 +171,11 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
         endReached = true;
       } catch (final ClassNotFoundException e) {
         e.printStackTrace();
-        throw new IllegalStateException(SingleDateDatabaseCorruptedErrorMessage);
+        throw new IllegalStateException(SINGLE_DATE_DATABASE_CORRUPTED_ERROR_MESSAGE);
       }
     }
     if (singleDateDatabaseEvent == null)
-      throw new IllegalStateException(SingleDateDatabaseCorruptedErrorMessage);
+      throw new IllegalStateException(SINGLE_DATE_DATABASE_CORRUPTED_ERROR_MESSAGE);
     return singleDateDatabaseEvent;
   }
 
@@ -187,7 +191,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
         endReached = true;
       } catch (final ClassNotFoundException e) {
         e.printStackTrace();
-        throw new IllegalStateException(SingleDateDatabaseCorruptedErrorMessage);
+        throw new IllegalStateException(SINGLE_DATE_DATABASE_CORRUPTED_ERROR_MESSAGE);
       }
     }
     return singleDateDatabaseEvents.build();
@@ -201,7 +205,7 @@ public final class SingleDateDatabaseActor extends LoggingReceiveActor {
       outputStream.flush();
     } catch (final IOException e) {
       throw new IllegalStateException(
-          "Error occurred while writing DateDatabaseEvent to ObjectOutputStream: " + e.toString());
+          ERROR_OCCURRED_WHILE_WRITING_DATE_DATABASE_EVENT_TO_OBJECT_OUTPUT_STREAM + e.toString());
     }
   }
 

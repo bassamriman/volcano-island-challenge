@@ -5,7 +5,7 @@ import akka.http.javadsl.model.HttpRequest;
 import akka.http.javadsl.model.MediaTypes;
 import akka.http.javadsl.model.StatusCodes;
 import com.rimanware.volcanoisland.common.RoutesTester;
-import com.rimanware.volcanoisland.errors.APIError;
+import com.rimanware.volcanoisland.errors.APIErrorImpl;
 import com.rimanware.volcanoisland.services.models.responses.*;
 import org.junit.Assert;
 import org.junit.Test;
@@ -121,7 +121,8 @@ public final class UpdateBookingTests extends RoutesTester {
         .assertStatusCode(StatusCodes.BAD_REQUEST)
         .assertEntityAs(
             Jackson.unmarshaller(SimpleError.class),
-            SimpleError.create(APIError.MaximumReservableDaysPerBookingError, apiErrorMessages));
+            SimpleError.create(
+                APIErrorImpl.MaximumReservableDaysPerBookingError, apiErrorMessages));
 
     final Availabilities availabilities = getAvailabilities(arrivalDate, departureDate);
 
@@ -154,7 +155,8 @@ public final class UpdateBookingTests extends RoutesTester {
         .assertStatusCode(StatusCodes.BAD_REQUEST)
         .assertEntityAs(
             Jackson.unmarshaller(SimpleError.class),
-            SimpleError.create(APIError.DepartureDateIsBeforeArrivalDateError, apiErrorMessages));
+            SimpleError.create(
+                APIErrorImpl.DepartureDateIsBeforeArrivalDateError, apiErrorMessages));
 
     final Availabilities availabilities = getAvailabilities(departureDate, arrivalDate);
 
@@ -190,7 +192,7 @@ public final class UpdateBookingTests extends RoutesTester {
             .entity(Jackson.unmarshaller(SimpleError.class));
 
     final SimpleError expectedError =
-        SimpleError.create(APIError.BookingIdNotFoundError, apiErrorMessages);
+        SimpleError.create(APIErrorImpl.BookingIdNotFoundError, apiErrorMessages);
 
     Assert.assertEquals(
         "Should contain error informing user that the given booking id was not found.",
@@ -231,7 +233,8 @@ public final class UpdateBookingTests extends RoutesTester {
             .entity(Jackson.unmarshaller(DateErrors.class));
 
     final DateError expectedDateError =
-        DateError.create(updateArrivalDate, APIError.MinimumAheadOfArrivalError, apiErrorMessages);
+        DateError.create(
+            updateArrivalDate, APIErrorImpl.MinimumAheadOfArrivalError, apiErrorMessages);
 
     Assert.assertTrue(
         "Should contain error informing user that the date is within the minimum allowed days ahead of arrival constraint.",
@@ -279,7 +282,7 @@ public final class UpdateBookingTests extends RoutesTester {
             .entity(Jackson.unmarshaller(DateErrors.class));
 
     final DateError expectedDateError =
-        DateError.create(updateArrivalDate, APIError.AlreadyOccurred, apiErrorMessages);
+        DateError.create(updateArrivalDate, APIErrorImpl.AlreadyOccurred, apiErrorMessages);
 
     Assert.assertTrue(
         "Should contain error informing user that the date has already occurred.",
@@ -306,7 +309,6 @@ public final class UpdateBookingTests extends RoutesTester {
     // Update booking
     final LocalDate updateArrivalDate =
         bookingConstraints.endDateOfReservationWindowGivenCurrentDate(currentDate).plusDays(1);
-    ;
     final LocalDate updateDepartureDate = updateArrivalDate;
 
     final DateErrors dateErrors =
@@ -330,7 +332,7 @@ public final class UpdateBookingTests extends RoutesTester {
 
     final DateError expectedDateError =
         DateError.create(
-            updateDepartureDate, APIError.MaximumAheadOfArrivalError, apiErrorMessages);
+            updateDepartureDate, APIErrorImpl.MaximumAheadOfArrivalError, apiErrorMessages);
 
     Assert.assertTrue(
         "Should contain error informing user that the date is past the maximum allowed days ahead of arrival constraint.",
@@ -400,14 +402,16 @@ public final class UpdateBookingTests extends RoutesTester {
             .entity(Jackson.unmarshaller(DateErrors.class));
 
     final DateError expectedDateErrorDueToDateBeingBooked =
-        DateError.create(updateDepartureDate, APIError.AlreadyBooked, apiErrorMessages);
+        DateError.create(updateDepartureDate, APIErrorImpl.AlreadyBooked, apiErrorMessages);
 
     final DateError expectedDateErrorDueToNotMeetingMinimumDateAheadOfArrivalConstraint =
         DateError.create(
-            updateArrivalDate.plusDays(1), APIError.MinimumAheadOfArrivalError, apiErrorMessages);
+            updateArrivalDate.plusDays(1),
+            APIErrorImpl.MinimumAheadOfArrivalError,
+            apiErrorMessages);
 
     final DateError expectedDateErrorDueToDateAlreadyOccurred =
-        DateError.create(updateArrivalDate, APIError.AlreadyOccurred, apiErrorMessages);
+        DateError.create(updateArrivalDate, APIErrorImpl.AlreadyOccurred, apiErrorMessages);
 
     Assert.assertEquals("Response should contain 3 errors", 3, dateErrors.getDateErrors().size());
 

@@ -12,11 +12,13 @@ import akka.http.javadsl.server.Route;
 import akka.stream.ActorMaterializer;
 import akka.stream.javadsl.Flow;
 import akka.util.Timeout;
-import com.rimanware.volcanoisland.common.BookingConstraints;
+import com.rimanware.volcanoisland.business.BookingConstraintsImpl;
+import com.rimanware.volcanoisland.business.api.BookingConstraints;
 import com.rimanware.volcanoisland.database.RollingMonthDatabaseActor;
 import com.rimanware.volcanoisland.database.SingleDateDatabaseManagerActor;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.APIErrorMessagesImpl;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.routes.AvailabilitiesRouteProvider;
 import com.rimanware.volcanoisland.routes.BookingRouteProvider;
 import com.rimanware.volcanoisland.routes.ConcatRouteProvider;
@@ -36,6 +38,17 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 public final class VolcanoIslandApp {
+
+  public static final String CREATE_BOOKING_REQUEST_HANDLER_DISPATCHER_ACTOR =
+      "CreateBookingRequestHandlerDispatcherActor";
+  public static final String UPDATE_BOOKING_REQUEST_HANDLER_DISPATCHER_ACTOR =
+      "UpdateBookingRequestHandlerDispatcherActor";
+  public static final String DELETE_BOOKING_REQUEST_HANDLER_DISPATCHER_ACTOR =
+      "DeleteBookingRequestHandlerDispatcherActor";
+  public static final String AVAILABILITY_REQUEST_HANDLER_DISPATCHER_ACTOR =
+      "AvailabilityRequestHandlerDispatcherActor";
+  public static final String ROLLING_MONTH_DATABASE_ACTOR = "RollingMonthDatabaseActor";
+
   public static void main(final String[] args) throws IOException {
     final Config config = ConfigFactory.load("application.conf");
     final ActorSystem system = ActorSystem.create("routes", config);
@@ -62,20 +75,20 @@ public final class VolcanoIslandApp {
     final Timeout timeout = Timeout.durationToTimeout(FiniteDuration.apply(5, TimeUnit.SECONDS));
 
     // This should be made configurable, but for the sake of simplicity it is hardcoded.
-    final BookingConstraints bookingConstraints = BookingConstraints.INSTANCE;
+    final BookingConstraints bookingConstraints = BookingConstraintsImpl.INSTANCE;
 
     // This should be determined by a more sophisticated internationalization implementation, but
     // for the sake of simplicity it is hardcoded.
-    final APIErrorMessages apiErrorMessages = APIErrorMessages.ENGLISH;
+    final APIErrorMessages apiErrorMessages = APIErrorMessagesImpl.ENGLISH;
 
     // Wire everything together manually as we are not using an Dependency Injection framework
     final ActorRef rollingMonthDatabaseActor =
         system.actorOf(
             RollingMonthDatabaseActor.props(
                 databaseFolderPath,
-                BookingConstraints.INSTANCE,
+                BookingConstraintsImpl.INSTANCE,
                 SingleDateDatabaseManagerActor::props),
-            "RollingMonthDatabaseActor");
+            ROLLING_MONTH_DATABASE_ACTOR);
     rollingMonthDatabaseActor.tell(
         RollingMonthDatabaseCommand.start(currentDate), ActorRef.noSender());
 
@@ -95,8 +108,7 @@ public final class VolcanoIslandApp {
       final APIErrorMessages apiErrorMessages) {
 
     final RouteProvider availabilitiesRouteProvider =
-        AvailabilitiesRouteProvider.create(
-            availabilityService, bookingConstraints, apiErrorMessages);
+        AvailabilitiesRouteProvider.create(availabilityService, apiErrorMessages);
 
     final RouteProvider bookingRouteProvider =
         BookingRouteProvider.create(bookingService, bookingConstraints, apiErrorMessages);
@@ -106,27 +118,27 @@ public final class VolcanoIslandApp {
   }
 
   private static BookingService getBookingService(
-          final ActorSystem system,
-          final Timeout timeout,
-          final ActorRef rollingMonthDatabaseActor,
-          final APIErrorMessages apiErrorMessages) {
+      final ActorSystem system,
+      final Timeout timeout,
+      final ActorRef rollingMonthDatabaseActor,
+      final APIErrorMessages apiErrorMessages) {
     final ActorRef createBookingRequestHandlerDispatcherActor =
         system.actorOf(
             RequestHandlerDispatcherActorFactory.createBookingRequestHandlerDispatcherActorProps(
                 rollingMonthDatabaseActor, apiErrorMessages),
-            "CreateBookingRequestHandlerDispatcherActor");
+            CREATE_BOOKING_REQUEST_HANDLER_DISPATCHER_ACTOR);
 
     final ActorRef updateBookingRequestHandlerDispatcherActor =
         system.actorOf(
             RequestHandlerDispatcherActorFactory.updateBookingRequestHandlerDispatcherActorProps(
                 rollingMonthDatabaseActor, apiErrorMessages),
-            "UpdateBookingRequestHandlerDispatcherActor");
+            UPDATE_BOOKING_REQUEST_HANDLER_DISPATCHER_ACTOR);
 
     final ActorRef deleteBookingRequestHandlerDispatcherActor =
         system.actorOf(
             RequestHandlerDispatcherActorFactory.deleteBookingRequestHandlerDispatcherActorProps(
                 rollingMonthDatabaseActor, apiErrorMessages),
-            "DeleteBookingRequestHandlerDispatcherActor");
+            DELETE_BOOKING_REQUEST_HANDLER_DISPATCHER_ACTOR);
 
     return BookingServiceImpl.create(
         createBookingRequestHandlerDispatcherActor,
@@ -136,15 +148,15 @@ public final class VolcanoIslandApp {
   }
 
   private static AvailabilityService getAvailabilityService(
-          final ActorSystem system,
-          final Timeout timeout,
-          final ActorRef rollingMonthDatabaseActor,
-          final APIErrorMessages apiErrorMessages) {
+      final ActorSystem system,
+      final Timeout timeout,
+      final ActorRef rollingMonthDatabaseActor,
+      final APIErrorMessages apiErrorMessages) {
     final ActorRef availabilityRequestHandlerDispatcherActor =
         system.actorOf(
             RequestHandlerDispatcherActorFactory.availabilityRequestHandlerDispatcherActorProps(
                 rollingMonthDatabaseActor, apiErrorMessages),
-            "AvailabilityRequestHandlerDispatcherActor");
+            AVAILABILITY_REQUEST_HANDLER_DISPATCHER_ACTOR);
 
     return AvailabilityServiceImpl.create(availabilityRequestHandlerDispatcherActor, timeout);
   }

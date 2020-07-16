@@ -1,6 +1,8 @@
 package com.rimanware.volcanoisland.common;
 
-import com.rimanware.volcanoisland.errors.APIError;
+import com.rimanware.volcanoisland.business.api.BookingConstraints;
+import com.rimanware.volcanoisland.errors.APIErrorImpl;
+import com.rimanware.volcanoisland.errors.api.APIError;
 
 import java.time.LocalDate;
 
@@ -90,12 +92,12 @@ public final class DateValidator {
     }
 
     public enum Reason {
-      AlreadyOccurred(APIError.AlreadyOccurred),
-      WithinMinimumAllowedDaysAheadOfArrival(APIError.MinimumAheadOfArrivalError),
-      PastMaximumAllowedDaysAheadOfArrival(APIError.MaximumAheadOfArrivalError),
-      MaximumReservableDaysPerBooking(APIError.MaximumReservableDaysPerBookingError),
-      EndDateIsBeforeStartDate(APIError.EndDateIsBeforeStartDateError),
-      DepartureDateIsBeforeArrivalDate(APIError.DepartureDateIsBeforeArrivalDateError);
+      AlreadyOccurred(APIErrorImpl.AlreadyOccurred),
+      WithinMinimumAllowedDaysAheadOfArrival(APIErrorImpl.MinimumAheadOfArrivalError),
+      PastMaximumAllowedDaysAheadOfArrival(APIErrorImpl.MaximumAheadOfArrivalError),
+      MaximumReservableDaysPerBooking(APIErrorImpl.MaximumReservableDaysPerBookingError),
+      EndDateIsBeforeStartDate(APIErrorImpl.EndDateIsBeforeStartDateError),
+      DepartureDateIsBeforeArrivalDate(APIErrorImpl.DepartureDateIsBeforeArrivalDateError);
 
       private final APIError apiError;
 

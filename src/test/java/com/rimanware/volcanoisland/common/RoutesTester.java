@@ -9,10 +9,13 @@ import akka.http.javadsl.testkit.JUnitRouteTest;
 import akka.http.javadsl.testkit.TestRoute;
 import akka.http.javadsl.testkit.TestRouteResult;
 import akka.util.Timeout;
+import com.rimanware.volcanoisland.business.BookingConstraintsImpl;
+import com.rimanware.volcanoisland.business.api.BookingConstraints;
 import com.rimanware.volcanoisland.database.RollingMonthDatabaseActor;
 import com.rimanware.volcanoisland.database.SingleDateDatabaseManagerActor;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.APIErrorMessagesImpl;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.routes.AvailabilitiesRouteProvider;
 import com.rimanware.volcanoisland.routes.BookingRouteProvider;
 import com.rimanware.volcanoisland.routes.ConcatRouteProvider;
@@ -26,15 +29,14 @@ import org.junit.After;
 import org.junit.Before;
 import scala.concurrent.duration.FiniteDuration;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 public abstract class RoutesTester extends JUnitRouteTest {
-  protected static final BookingConstraints bookingConstraints = BookingConstraints.INSTANCE;
-  protected static final APIErrorMessages apiErrorMessages = APIErrorMessages.ENGLISH;
+  protected static final BookingConstraints bookingConstraints = BookingConstraintsImpl.INSTANCE;
+  protected static final APIErrorMessages apiErrorMessages = APIErrorMessagesImpl.ENGLISH;
   protected static final Timeout timeout =
       Timeout.durationToTimeout(FiniteDuration.apply(5, TimeUnit.SECONDS));
 
@@ -56,7 +58,7 @@ public abstract class RoutesTester extends JUnitRouteTest {
         system()
             .actorOf(
                 RollingMonthDatabaseActor.propsInMemory(
-                    BookingConstraints.INSTANCE, SingleDateDatabaseManagerActor::props),
+                    BookingConstraintsImpl.INSTANCE, SingleDateDatabaseManagerActor::props),
                 "RollingMonthDatabaseActor-" + UUID.randomUUID().toString());
 
     initializeRoutes(rollingMonthDatabaseActor);
@@ -100,7 +102,6 @@ public abstract class RoutesTester extends JUnitRouteTest {
     final RouteProvider availabilitiesRouteProvider =
         AvailabilitiesRouteProvider.create(
             AvailabilityServiceImpl.create(availabilityRequestHandlerDispatcherActor, timeout),
-            bookingConstraints,
             apiErrorMessages);
 
     final RouteProvider bookingRouteProvider =
@@ -120,7 +121,7 @@ public abstract class RoutesTester extends JUnitRouteTest {
   }
 
   @After
-  public void afterTest() throws InterruptedException, IOException {
+  public void afterTest() {
     cleanUpActors();
   }
 

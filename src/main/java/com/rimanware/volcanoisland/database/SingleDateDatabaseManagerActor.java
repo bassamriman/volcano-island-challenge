@@ -18,6 +18,8 @@ import java.util.UUID;
 
 public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
 
+  public static final String READ_REPLICA_SINGLE_DATE_DATABASE = "ReadReplicaSingleDateDatabase-";
+  public static final String WRITE_SINGLE_DATE_DATABASE = "WriteSingleDateDatabase-";
   private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
   private final String ioDispatcher = "akka.actor.blocking-io-dispatcher";
   private final LocalDate date;
@@ -61,14 +63,14 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
                   getContext()
                       .actorOf(
                           SingleDateDatabaseReadReplicaActor.props(date),
-                          "ReadReplicaSingleDateDatabase-" + date.toString());
+                          READ_REPLICA_SINGLE_DATE_DATABASE + date.toString());
               final ActorRef writeReadActor =
                   getContext()
                       .actorOf(
                           getWriteSingleDateDatabaseProps(
                                   maybeDatabaseFolderPath, date, readReplicaActor)
                               .withDispatcher(ioDispatcher),
-                          "WriteSingleDateDatabase-" + date.toString());
+                          WRITE_SINGLE_DATE_DATABASE + date.toString());
               getContext().become(started(ImmutableList.of(), writeReadActor, readReplicaActor));
             })
         .matchAny(o -> log.info("received unknown message {}", o))
@@ -172,17 +174,6 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
     return inactive();
   }
 
-  public interface SingleDateDatabaseManagerCommand {
-
-    static Start start() {
-      return Start.INSTANCE;
-    }
-
-    static Deactivate deactivate() {
-      return Deactivate.INSTANCE;
-    }
-  }
-
   enum Start implements SingleDateDatabaseManagerCommand {
     INSTANCE;
 
@@ -202,6 +193,17 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
     @Override
     public String toString() {
       return "Deactivate{}";
+    }
+  }
+
+  public interface SingleDateDatabaseManagerCommand {
+
+    static Start start() {
+      return Start.INSTANCE;
+    }
+
+    static Deactivate deactivate() {
+      return Deactivate.INSTANCE;
     }
   }
 

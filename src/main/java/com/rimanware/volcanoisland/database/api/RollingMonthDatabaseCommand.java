@@ -27,6 +27,17 @@ public interface RollingMonthDatabaseCommand {
     }
   }
 
+  enum Deactivate implements RollingMonthDatabaseCommand {
+    INSTANCE;
+
+    Deactivate() {}
+
+    @Override
+    public String toString() {
+      return "Deactivate{}";
+    }
+  }
+
   final class Start implements RollingMonthDatabaseCommand {
     private final LocalDate date;
 
@@ -45,17 +56,6 @@ public interface RollingMonthDatabaseCommand {
 
     public LocalDate getDate() {
       return date;
-    }
-  }
-
-  enum Deactivate implements RollingMonthDatabaseCommand {
-    INSTANCE;
-
-    Deactivate() {}
-
-    @Override
-    public String toString() {
-      return "Deactivate{}";
     }
   }
 }

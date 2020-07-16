@@ -10,8 +10,8 @@ import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseResponse;
 import com.rimanware.volcanoisland.database.models.Booking;
-import com.rimanware.volcanoisland.errors.APIError;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.APIErrorImpl;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.requests.UpdateBookingRequest;
 import com.rimanware.volcanoisland.services.models.responses.BookingConfirmation;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerCommand;
@@ -54,6 +54,11 @@ public final class UpdateBookingRequestHandlerActor
         () ->
             UpdateBookingRequestHandlerActor.create(
                 updateBookingRequest, apiErrorMessages, database));
+  }
+
+  private static ImmutableList<LocalDate> datesToRollBack(
+      final BookingRequestState bookingRequestState) {
+    return bookingRequestState.getNewlyBookedDates();
   }
 
   @Override
@@ -100,11 +105,6 @@ public final class UpdateBookingRequestHandlerActor
             })
         .matchAny(o -> log.info("received unknown message {}", o))
         .build();
-  }
-
-  private static ImmutableList<LocalDate> datesToRollBack(
-      final BookingRequestState bookingRequestState) {
-    return bookingRequestState.getNewlyBookedDates();
   }
 
   @Override
@@ -203,7 +203,7 @@ public final class UpdateBookingRequestHandlerActor
     if (!updateBookingRequestState.getFoundBookingToBeUpdated()) {
 
       return RequestHandlerResponse.Failure.failed(
-          APIError.BookingIdNotFoundError, apiErrorMessages);
+          APIErrorImpl.BookingIdNotFoundError, apiErrorMessages);
 
     } else if (!updateBookingRequestState.getAlreadyBookedDates().isEmpty()
         || !updateBookingRequestState.getOutOfRangeDates().isEmpty()) {

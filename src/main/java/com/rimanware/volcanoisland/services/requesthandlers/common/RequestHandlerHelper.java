@@ -2,8 +2,8 @@ package com.rimanware.volcanoisland.services.requesthandlers.common;
 
 import com.google.common.collect.ImmutableList;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
-import com.rimanware.volcanoisland.errors.APIError;
-import com.rimanware.volcanoisland.errors.APIErrorMessages;
+import com.rimanware.volcanoisland.errors.APIErrorImpl;
+import com.rimanware.volcanoisland.errors.api.APIErrorMessages;
 import com.rimanware.volcanoisland.services.models.responses.DateError;
 import com.rimanware.volcanoisland.services.models.responses.DateErrors;
 import com.rimanware.volcanoisland.services.requesthandlers.api.RequestHandlerResponse;
@@ -27,14 +27,14 @@ public final class RequestHandlerHelper {
                                 DateError.create(
                                     outOfRangeFailedDate.getRequestedDate(),
                                     outOfRangeFailedDate.getReason().getApiError(),
-                                    APIErrorMessages.ENGLISH)),
+                                    apiErrorMessages)),
                     alreadyBookedFailedDates.stream()
                         .map(
                             alreadyBookedDate ->
                                 DateError.create(
                                     alreadyBookedDate,
-                                    APIError.AlreadyBooked,
-                                    APIErrorMessages.ENGLISH)))
+                                    APIErrorImpl.AlreadyBooked,
+                                    apiErrorMessages)))
                 .collect(ImmutableList.toImmutableList())));
   }
 }

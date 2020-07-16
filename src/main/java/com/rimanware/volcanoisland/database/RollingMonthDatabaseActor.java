@@ -8,7 +8,11 @@ import akka.event.LoggingAdapter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.rimanware.volcanoisland.common.*;
+import com.rimanware.volcanoisland.business.api.BookingConstraints;
+import com.rimanware.volcanoisland.common.DateValidator;
+import com.rimanware.volcanoisland.common.LoggingReceiveActor;
+import com.rimanware.volcanoisland.common.Tuple;
+import com.rimanware.volcanoisland.common.UtilityFunctions;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
@@ -18,6 +22,8 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 
 public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
+
+  public static final String SINGLE_DATE_DATABASE_MANAGER_ACTOR = "SingleDateDatabaseManagerActor-";
 
   private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
   private final Optional<String> databaseFolderPath;
@@ -89,7 +95,6 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
   }
 
   // TODO: Make this support date rolling
-  // TODO: Clean up duplicate code
   private Receive started(
       final LocalDate currentDate,
       final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor) {
@@ -174,11 +179,11 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
   }
 
   private <Message> void forwardToIntendedDateDatabaseElseReplyToSender(
-          final LocalDate date,
-          final Message msg,
-          final ActorRef sender,
-          final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor,
-          final LocalDate currentDate) {
+      final LocalDate date,
+      final Message msg,
+      final ActorRef sender,
+      final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor,
+      final LocalDate currentDate) {
 
     final DateValidator.DateValidation validation =
         DateValidator.isInValidRange(date, currentDate, bookingConstraints);
@@ -193,7 +198,8 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
   }
 
   private ActorRef singleDateDatabaseOf(
-          final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor, final LocalDate date) {
+      final ImmutableMap<String, ActorRef> dateToSingleDateDatabaseManagerActor,
+      final LocalDate date) {
     return Optional.ofNullable(dateToSingleDateDatabaseManagerActor.get(date.toString()))
         .orElseThrow(() -> singleDateDatabaseActorReferenceNotFoundFor(date));
   }
@@ -229,7 +235,7 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
   }
 
   private ImmutableMap<String, ActorRef> createAllSingleDateDatabaseManagerActors(
-          final ImmutableList<LocalDate> reservableDays) {
+      final ImmutableList<LocalDate> reservableDays) {
     return reservableDays.stream()
         .map(
             day -> {
@@ -237,7 +243,7 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
                   getContext()
                       .actorOf(
                           singleDateDatabaseActorProps.apply(day, databaseFolderPath),
-                          "SingleDateDatabaseManagerActor-" + day.toString());
+                          SINGLE_DATE_DATABASE_MANAGER_ACTOR + day.toString());
               newSingleDateDatabaseActor.tell(
                   SingleDateDatabaseManagerActor.SingleDateDatabaseManagerCommand.start(), self());
               return Tuple.create(day.toString(), newSingleDateDatabaseActor);

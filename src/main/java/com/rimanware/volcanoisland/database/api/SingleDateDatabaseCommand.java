@@ -33,6 +33,17 @@ public interface SingleDateDatabaseCommand {
     return GetAvailability.create(date);
   }
 
+  enum RequestHistory implements SingleDateDatabaseCommand {
+    INSTANCE;
+
+    RequestHistory() {}
+
+    @Override
+    public String toString() {
+      return "RequestHistory{}";
+    }
+  }
+
   final class Book implements SingleDateDatabaseCommand {
     private final Booking booking;
     private final LocalDate date;
@@ -137,17 +148,6 @@ public interface SingleDateDatabaseCommand {
 
     public LocalDate getDate() {
       return date;
-    }
-  }
-
-  enum RequestHistory implements SingleDateDatabaseCommand {
-    INSTANCE;
-
-    RequestHistory() {}
-
-    @Override
-    public String toString() {
-      return "RequestHistory{}";
     }
   }
 
