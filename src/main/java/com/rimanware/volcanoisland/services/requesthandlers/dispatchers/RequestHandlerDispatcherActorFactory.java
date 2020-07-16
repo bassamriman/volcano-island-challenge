@@ -15,13 +15,13 @@ import java.util.UUID;
 
 public final class RequestHandlerDispatcherActorFactory {
 
-  public static final String AVAILABILITY_REQUEST_HANDLER_ACTOR =
+  private static final String AVAILABILITY_REQUEST_HANDLER_ACTOR =
       "AvailabilityRequestHandlerActor-";
-  public static final String CREATE_BOOKING_REQUEST_HANDLER_ACTOR =
+  private static final String CREATE_BOOKING_REQUEST_HANDLER_ACTOR =
       "CreateBookingRequestHandlerActor-";
-  public static final String UPDATE_BOOKING_REQUEST_HANDLER_ACTOR =
+  private static final String UPDATE_BOOKING_REQUEST_HANDLER_ACTOR =
       "UpdateBookingRequestHandlerActor";
-  public static final String DELETE_BOOKING_REQUEST_HANDLER_ACTOR =
+  private static final String DELETE_BOOKING_REQUEST_HANDLER_ACTOR =
       "DeleteBookingRequestHandlerActor-";
 
   public static Props availabilityRequestHandlerDispatcherActorProps(

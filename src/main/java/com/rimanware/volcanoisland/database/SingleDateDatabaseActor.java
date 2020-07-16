@@ -18,15 +18,15 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 public final class SingleDateDatabaseActor extends LoggingReceiveActor {
+  private static final String
+      ERROR_OCCURRED_WHILE_WRITING_DATE_DATABASE_EVENT_TO_OBJECT_OUTPUT_STREAM =
+          "Error occurred while writing DateDatabaseEvent to ObjectOutputStream: ";
   private static final String SINGLE_DATE_DATABASE_CORRUPTED_ERROR_MESSAGE =
       "SingleDateDatabase file not properly initialized or is corrupted. "
           + "File should contain at least one event. "
           + "File should be initialized with NoBooking DateDatabaseEvent.";
   private static final String SINGLE_DATE_DATABASE_FILE_DOESN_T_EXIST_NEEDS_TO_BE_CREATED =
       "SingleDateDatabase file doesn't exist. Needs to be created";
-  public static final String
-      ERROR_OCCURRED_WHILE_WRITING_DATE_DATABASE_EVENT_TO_OBJECT_OUTPUT_STREAM =
-          "Error occurred while writing DateDatabaseEvent to ObjectOutputStream: ";
   private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
   private final LocalDate date;
   private final Receive initialBehaviour;

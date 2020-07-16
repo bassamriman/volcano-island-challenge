@@ -10,34 +10,66 @@ import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
 
 import java.time.LocalDate;
 
-public final class AvailabilitiesRequest {
-  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy")
-  @JsonDeserialize(using = LocalDateDeserializer.class)
-  @JsonSerialize(using = LocalDateSerializer.class)
-  private final LocalDate startDate;
+public interface AvailabilitiesRequest {
 
-  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy")
-  @JsonDeserialize(using = LocalDateDeserializer.class)
-  @JsonSerialize(using = LocalDateSerializer.class)
-  private final LocalDate endDate;
-
-  @JsonCreator
-  private AvailabilitiesRequest(
-      @JsonProperty("startDate") final LocalDate startDate,
-      @JsonProperty("endDate") final LocalDate endDate) {
-    this.startDate = startDate;
-    this.endDate = endDate;
+  static AvailabilitiesRequest.Empty empty() {
+    return Empty.INSTANCE;
   }
 
-  private static AvailabilitiesRequest create(final LocalDate start, final LocalDate end) {
-    return new AvailabilitiesRequest(start, end);
+  static AvailabilitiesRequest.DateRange dateRange(final LocalDate start, final LocalDate end) {
+    return AvailabilitiesRequest.dateRange(start, end);
   }
 
-  public LocalDate getStartDate() {
-    return startDate;
+  enum Empty implements AvailabilitiesRequest {
+    INSTANCE;
+
+    Empty() {}
+
+    @Override
+    public String toString() {
+      return "AvailabilitiesRequest.Empty{}";
+    }
   }
 
-  public LocalDate getEndDate() {
-    return endDate;
+  final class DateRange implements AvailabilitiesRequest {
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy")
+    @JsonDeserialize(using = LocalDateDeserializer.class)
+    @JsonSerialize(using = LocalDateSerializer.class)
+    private final LocalDate startDate;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy")
+    @JsonDeserialize(using = LocalDateDeserializer.class)
+    @JsonSerialize(using = LocalDateSerializer.class)
+    private final LocalDate endDate;
+
+    @JsonCreator
+    private DateRange(
+        @JsonProperty("startDate") final LocalDate startDate,
+        @JsonProperty("endDate") final LocalDate endDate) {
+      this.startDate = startDate;
+      this.endDate = endDate;
+    }
+
+    public static DateRange create(final LocalDate start, final LocalDate end) {
+      return new DateRange(start, end);
+    }
+
+    public LocalDate getStartDate() {
+      return startDate;
+    }
+
+    public LocalDate getEndDate() {
+      return endDate;
+    }
+
+    @Override
+    public String toString() {
+      return "AvailabilitiesRequest.DateRange{"
+          + "startDate="
+          + startDate
+          + ", endDate="
+          + endDate
+          + '}';
+    }
   }
 }

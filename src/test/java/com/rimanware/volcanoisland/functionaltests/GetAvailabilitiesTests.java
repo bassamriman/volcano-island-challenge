@@ -2,7 +2,6 @@ package com.rimanware.volcanoisland.functionaltests;
 
 import akka.http.javadsl.marshallers.jackson.Jackson;
 import akka.http.javadsl.model.HttpRequest;
-import akka.http.javadsl.model.MediaTypes;
 import akka.http.javadsl.model.StatusCodes;
 import com.rimanware.volcanoisland.common.RoutesTester;
 import com.rimanware.volcanoisland.errors.APIErrorImpl;
@@ -21,18 +20,7 @@ public final class GetAvailabilitiesTests extends RoutesTester {
     final LocalDate endDate = startDate.minusDays(1);
 
     volcanoIslandApp
-        .run(
-            HttpRequest.GET("/availabilities")
-                .withEntity(
-                    MediaTypes.APPLICATION_JSON.toContentType(),
-                    "{\n"
-                        + "    \"startDate\":\""
-                        + startDate.format(dateFormatter)
-                        + "\",\n"
-                        + "    \"endDate\":\""
-                        + endDate.format(dateFormatter)
-                        + "\"\n"
-                        + "}"))
+        .run(getAvailabilitiesRequest(startDate, endDate))
         .assertStatusCode(StatusCodes.BAD_REQUEST)
         .assertEntityAs(
             Jackson.unmarshaller(SimpleError.class),
@@ -46,6 +34,20 @@ public final class GetAvailabilitiesTests extends RoutesTester {
     final LocalDate endDate = currentDate.plusDays(50);
 
     final Availabilities availabilities = getAvailabilities(startDate, endDate);
+    Assert.assertEquals(
+        "Date range within the booking request should remain available",
+        availabilities.getAvailabilities().size(),
+        bookingConstraints.getMaximumAllowedDaysToBookAheadOfArrivalDate());
+  }
+
+  @Test
+  public void getAvailabilityWithEmptyPayloadShouldReturnAllAvailableDateOfTheMonth() {
+    final Availabilities availabilities =
+        volcanoIslandApp
+            .run(HttpRequest.GET("/availabilities"))
+            .assertStatusCode(StatusCodes.OK)
+            .entity(Jackson.unmarshaller(Availabilities.class));
+
     Assert.assertEquals(
         "Date range within the booking request should remain available",
         availabilities.getAvailabilities().size(),

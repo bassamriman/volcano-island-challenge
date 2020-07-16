@@ -18,10 +18,10 @@ import java.util.UUID;
 
 public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
 
-  public static final String READ_REPLICA_SINGLE_DATE_DATABASE = "ReadReplicaSingleDateDatabase-";
-  public static final String WRITE_SINGLE_DATE_DATABASE = "WriteSingleDateDatabase-";
+  private static final String READ_REPLICA_SINGLE_DATE_DATABASE = "ReadReplicaSingleDateDatabase-";
+  private static final String WRITE_SINGLE_DATE_DATABASE = "WriteSingleDateDatabase-";
+  private static final String IO_DISPATCHER = "akka.actor.blocking-io-dispatcher";
   private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
-  private final String ioDispatcher = "akka.actor.blocking-io-dispatcher";
   private final LocalDate date;
   private final Optional<String> maybeDatabaseFolderPath;
 
@@ -69,7 +69,7 @@ public final class SingleDateDatabaseManagerActor extends LoggingReceiveActor {
                       .actorOf(
                           getWriteSingleDateDatabaseProps(
                                   maybeDatabaseFolderPath, date, readReplicaActor)
-                              .withDispatcher(ioDispatcher),
+                              .withDispatcher(IO_DISPATCHER),
                           WRITE_SINGLE_DATE_DATABASE + date.toString());
               getContext().become(started(ImmutableList.of(), writeReadActor, readReplicaActor));
             })

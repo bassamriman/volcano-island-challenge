@@ -23,7 +23,8 @@ import java.util.function.BiFunction;
 
 public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
 
-  public static final String SINGLE_DATE_DATABASE_MANAGER_ACTOR = "SingleDateDatabaseManagerActor-";
+  private static final String SINGLE_DATE_DATABASE_MANAGER_ACTOR =
+      "SingleDateDatabaseManagerActor-";
 
   private final LoggingAdapter log = Logging.getLogger(getContext().getSystem(), this);
   private final Optional<String> databaseFolderPath;
@@ -163,7 +164,9 @@ public final class RollingMonthDatabaseActor extends LoggingReceiveActor {
               sender()
                   .tell(
                       RollingMonthDatabaseResponse.queryableDates(
-                          dateToSingleDateDatabaseManagerActor.keySet()),
+                          dateToSingleDateDatabaseManagerActor.keySet().stream()
+                              .map(LocalDate::parse)
+                              .collect(ImmutableSet.toImmutableSet())),
                       self());
             })
         .match(

@@ -7,5 +7,7 @@ import java.util.concurrent.CompletionStage;
 
 public interface AvailabilityService {
   CompletionStage<RequestHandlerResponse> getAvailabilities(
-      AvailabilitiesRequest availabilitiesRequest);
+      AvailabilitiesRequest.DateRange availabilitiesRequest);
+
+  CompletionStage<RequestHandlerResponse> getAvailabilities();
 }

@@ -165,19 +165,22 @@ public abstract class RoutesTester extends JUnitRouteTest {
   protected final Availabilities getAvailabilities(
       final LocalDate arrivalDate, final LocalDate departureDate) {
     return volcanoIslandApp
-        .run(
-            HttpRequest.GET("/availabilities")
-                .withEntity(
-                    MediaTypes.APPLICATION_JSON.toContentType(),
-                    "{\n"
-                        + "    \"startDate\":\""
-                        + arrivalDate.format(dateFormatter)
-                        + "\",\n"
-                        + "    \"endDate\":\""
-                        + departureDate.format(dateFormatter)
-                        + "\"\n"
-                        + "}"))
+        .run(getAvailabilitiesRequest(arrivalDate, departureDate))
         .assertStatusCode(StatusCodes.OK)
         .entity(Jackson.unmarshaller(Availabilities.class));
+  }
+
+  protected final HttpRequest getAvailabilitiesRequest(final LocalDate arrivalDate, final LocalDate departureDate) {
+    return HttpRequest.GET("/availabilities")
+        .withEntity(
+            MediaTypes.APPLICATION_JSON.toContentType(),
+            "{\n"
+                + "    \"startDate\":\""
+                + arrivalDate.format(dateFormatter)
+                + "\",\n"
+                + "    \"endDate\":\""
+                + departureDate.format(dateFormatter)
+                + "\"\n"
+                + "}");
   }
 }

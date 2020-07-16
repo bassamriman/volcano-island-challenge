@@ -27,9 +27,15 @@ public final class AvailabilityServiceImpl implements AvailabilityService {
 
   @Override
   public CompletionStage<RequestHandlerResponse> getAvailabilities(
-      final AvailabilitiesRequest availabilitiesRequest) {
+      final AvailabilitiesRequest.DateRange availabilitiesRequest) {
 
     return ask(availabilityRequestHandlerDispatcherActor, availabilitiesRequest, timeout)
+        .thenApply((RequestHandlerResponse.class::cast));
+  }
+
+  @Override
+  public CompletionStage<RequestHandlerResponse> getAvailabilities() {
+    return ask(availabilityRequestHandlerDispatcherActor, AvailabilitiesRequest.empty(), timeout)
         .thenApply((RequestHandlerResponse.class::cast));
   }
 }

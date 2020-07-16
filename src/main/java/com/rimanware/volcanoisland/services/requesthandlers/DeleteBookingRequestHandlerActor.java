@@ -3,6 +3,7 @@ package com.rimanware.volcanoisland.services.requesthandlers;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.rimanware.volcanoisland.common.UtilityFunctions;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
@@ -56,22 +57,26 @@ public final class DeleteBookingRequestHandlerActor
             book -> {
               final ActorRef sender = sender();
               database.tell(RollingMonthDatabaseCommand.getQueryableDates(), self());
-              getContext().become(waitingForNumberOfQueryableDates(sender));
+              getContext().become(waitingForQueryableDates(sender));
             })
         .matchAny(o -> log.info("received unknown message {}", o))
         .build();
   }
 
-  private Receive waitingForNumberOfQueryableDates(final ActorRef originalSender) {
+  private Receive waitingForQueryableDates(final ActorRef originalSender) {
     return receiveBuilder()
         .match(
             RollingMonthDatabaseResponse.QueryableDates.class,
             queryableDates -> {
               database.tell(SingleDateDatabaseCommand.cancel(bookingId), self());
+
               getContext()
                   .become(
                       collectingResponses(
-                          ResponseCollector.empty(queryableDates.getQueryableDates()),
+                          ResponseCollector.empty(
+                              queryableDates.getQueryableDates().stream()
+                                  .map(LocalDate::toString)
+                                  .collect(ImmutableSet.toImmutableSet())),
                           DeleteRequestState.empty(originalSender)));
             })
         .matchAny(o -> log.info("received unknown message"))

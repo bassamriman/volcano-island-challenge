@@ -5,6 +5,7 @@ import akka.actor.Props;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.rimanware.volcanoisland.common.UtilityFunctions;
+import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.RollingMonthDatabaseResponse;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseCommand;
 import com.rimanware.volcanoisland.database.api.SingleDateDatabaseResponse;
@@ -57,24 +58,47 @@ public final class AvailabilityRequestHandlerActor
             book -> {
               final ActorRef sender = sender();
 
-              final ImmutableSet<LocalDate> daysToQuery =
-                  UtilityFunctions.generateAllDatesInRange(
-                      availabilitiesRequest.getStartDate(), availabilitiesRequest.getEndDate());
-
-              daysToQuery.forEach(
-                  day -> database.tell(SingleDateDatabaseCommand.getAvailability(day), self()));
-
-              getContext()
-                  .become(
-                      collectingResponses(
-                          ResponseCollector.empty(
-                              daysToQuery.stream()
-                                  .map(LocalDate::toString)
-                                  .collect(ImmutableSet.toImmutableSet())),
-                          AvailabilityRequestState.empty(sender)));
+              if (availabilitiesRequest instanceof AvailabilitiesRequest.DateRange) {
+                final AvailabilitiesRequest.DateRange dateRange =
+                    (AvailabilitiesRequest.DateRange) availabilitiesRequest;
+                final ImmutableSet<LocalDate> daysToQuery =
+                    UtilityFunctions.generateAllDatesInRange(
+                        dateRange.getStartDate(), dateRange.getEndDate());
+                requestAllDatesThenTransitionToCollectingState(sender, daysToQuery);
+              } else {
+                database.tell(RollingMonthDatabaseCommand.getQueryableDates(), self());
+                getContext().become(waitingForNumberOfQueryableDates(sender));
+              }
             })
         .matchAny(o -> log.info("received unknown message {}", o))
         .build();
+  }
+
+  private Receive waitingForNumberOfQueryableDates(final ActorRef originalSender) {
+    return receiveBuilder()
+        .match(
+            RollingMonthDatabaseResponse.QueryableDates.class,
+            queryableDates -> {
+              requestAllDatesThenTransitionToCollectingState(
+                  originalSender, queryableDates.getQueryableDates());
+            })
+        .matchAny(o -> log.info("received unknown message {}", o))
+        .build();
+  }
+
+  private void requestAllDatesThenTransitionToCollectingState(
+      final ActorRef originalSender, final ImmutableSet<LocalDate> queryableDates) {
+    queryableDates.forEach(
+        day -> database.tell(SingleDateDatabaseCommand.getAvailability(day), self()));
+
+    getContext()
+        .become(
+            collectingResponses(
+                ResponseCollector.empty(
+                    queryableDates.stream()
+                        .map(LocalDate::toString)
+                        .collect(ImmutableSet.toImmutableSet())),
+                AvailabilityRequestState.empty(originalSender)));
   }
 
   @Override

@@ -17,7 +17,7 @@ public interface RollingMonthDatabaseResponse {
     return RequestedDatesOutOfRange.create(requestedDatesOutOfRange);
   }
 
-  static QueryableDates queryableDates(final ImmutableSet<String> queryableDates) {
+  static QueryableDates queryableDates(final ImmutableSet<LocalDate> queryableDates) {
     return QueryableDates.create(queryableDates);
   }
 
@@ -82,13 +82,13 @@ public interface RollingMonthDatabaseResponse {
   }
 
   final class QueryableDates implements RollingMonthDatabaseResponse {
-    private final ImmutableSet<String> queryableDates;
+    private final ImmutableSet<LocalDate> queryableDates;
 
-    private QueryableDates(final ImmutableSet<String> queryableDates) {
+    private QueryableDates(final ImmutableSet<LocalDate> queryableDates) {
       this.queryableDates = queryableDates;
     }
 
-    public static QueryableDates create(final ImmutableSet<String> queryableDates) {
+    public static QueryableDates create(final ImmutableSet<LocalDate> queryableDates) {
       return new QueryableDates(queryableDates);
     }
 
@@ -97,7 +97,7 @@ public interface RollingMonthDatabaseResponse {
       return "QueryableDates{" + "queryableDates=" + queryableDates + '}';
     }
 
-    public ImmutableSet<String> getQueryableDates() {
+    public ImmutableSet<LocalDate> getQueryableDates() {
       return queryableDates;
     }
   }

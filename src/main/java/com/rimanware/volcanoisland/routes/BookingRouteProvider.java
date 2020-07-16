@@ -17,6 +17,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 public final class BookingRouteProvider extends RouteProviderWithValidation {
+  private static final String BOOKINGS = "bookings";
   private final BookingService bookingService;
   private final BookingConstraints bookingConstraints;
   private final APIErrorMessages apiErrorMessages;
@@ -45,7 +46,7 @@ public final class BookingRouteProvider extends RouteProviderWithValidation {
   @Override
   public Route getRoutes() {
     return pathPrefix(
-        "bookings",
+        BOOKINGS,
         () ->
             route(
                 // Create

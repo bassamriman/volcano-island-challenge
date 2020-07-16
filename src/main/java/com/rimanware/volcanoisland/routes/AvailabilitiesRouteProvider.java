@@ -14,6 +14,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 public final class AvailabilitiesRouteProvider extends RouteProviderWithValidation {
+  private static final String AVAILABILITIES = "availabilities";
   private final AvailabilityService availabilityService;
   private final APIErrorMessages apiErrorMessages;
 
@@ -36,25 +37,33 @@ public final class AvailabilitiesRouteProvider extends RouteProviderWithValidati
   @Override
   public Route getRoutes() {
     return pathPrefix(
-        "availabilities",
+        AVAILABILITIES,
         () ->
             route(
                 // Create
                 pathEnd(
                     () ->
-                        get(
-                            () ->
-                                entity(
-                                    Jackson.unmarshaller(AvailabilitiesRequest.class),
-                                    availabilitiesRequest ->
-                                        getAvailabilitiesRequestRoute(
-                                            availabilitiesRequest,
-                                            availabilityService::getAvailabilities))))));
+                        route(
+                            get(
+                                () ->
+                                    entity(
+                                        Jackson.unmarshaller(AvailabilitiesRequest.DateRange.class),
+                                        availabilitiesRequest ->
+                                            getAvailabilitiesRequestRoute(
+                                                availabilitiesRequest,
+                                                availabilityService::getAvailabilities))),
+                            get(
+                                () ->
+                                    onSuccess(
+                                        availabilityService.getAvailabilities(),
+                                        response ->
+                                            handleBookingRequestResponse(
+                                                response, StatusCodes.OK)))))));
   }
 
   private Route getAvailabilitiesRequestRoute(
-      final AvailabilitiesRequest availabilitiesRequest,
-      final Function<AvailabilitiesRequest, CompletionStage<RequestHandlerResponse>>
+      final AvailabilitiesRequest.DateRange availabilitiesRequest,
+      final Function<AvailabilitiesRequest.DateRange, CompletionStage<RequestHandlerResponse>>
           requestHandler) {
 
     return validateThenHandleRequest(

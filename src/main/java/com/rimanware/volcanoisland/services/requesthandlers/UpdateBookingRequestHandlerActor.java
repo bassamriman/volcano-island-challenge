@@ -73,13 +73,13 @@ public final class UpdateBookingRequestHandlerActor
             book -> {
               final ActorRef sender = sender();
               database.tell(RollingMonthDatabaseCommand.getQueryableDates(), self());
-              getContext().become(waitingForNumberOfQueryableDates(sender));
+              getContext().become(waitingForQueryableDates(sender));
             })
         .matchAny(o -> log.info("received unknown message {}", o))
         .build();
   }
 
-  private Receive waitingForNumberOfQueryableDates(final ActorRef originalSender) {
+  private Receive waitingForQueryableDates(final ActorRef originalSender) {
     return receiveBuilder()
         .match(
             RollingMonthDatabaseResponse.QueryableDates.class,
@@ -95,7 +95,11 @@ public final class UpdateBookingRequestHandlerActor
                       .collect(ImmutableSet.toImmutableSet());
 
               final ImmutableSet<String> expectedDateUpdateResponses =
-                  UtilityFunctions.combine(queryableDates.getQueryableDates(), daysToBookAsString);
+                  UtilityFunctions.combine(
+                      queryableDates.getQueryableDates().stream()
+                          .map(LocalDate::toString)
+                          .collect(ImmutableSet.toImmutableSet()),
+                      daysToBookAsString);
 
               getContext()
                   .become(
