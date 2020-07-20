@@ -213,6 +213,7 @@ If none got deleted then we can conclude that booking id doesn't exist.
 Updating a booking will come down to broadcasting (in asynchronous fashion ), to all date database, the booking update request (because we don't know the dates of the previous version of the booking).
 Handling of an update request at the date database level is a bit more complex. The date database handling of an update request is shown in the table below:
 ![Update Request to Date Database handeling](images/UpdateDateDatabaseTable.JPG)
+**CORRECTION:** for the case where it's yes yes no it should be a **delete** [Corrected on 20/07/2020] 
 ###### Getting availabilities
 Get availabilities comes down to broadcasting a get availability request to the 30 date databases and aggregating the responses. This is super fast as the date database caches the latest booking in memory without need to read from file.
 #### Summary
